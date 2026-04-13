@@ -2,11 +2,13 @@ import { useState, useEffect } from "react";
 import Head from "next/head";
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, ComposedChart, Bar, Line } from "recharts";
 
+// Design Colors & Styles
 var CC = {bg:"#F7F8FA",card:"#FFF",bdr:"#E8ECF1",bdrL:"#F0F2F5",tx:"#1A1F36",tx2:"#5E6278",txM:"#8A92A6",txL:"#9CA3B8",grn:"#0D9F6E",red:"#E02D3C",org:"#D97706",blu:"#2563EB",pur:"#7C3AED"};
 var FF = "'Outfit','Avenir Next',system-ui,sans-serif";
 var thS = {padding:"8px 10px",fontSize:10,fontWeight:700,color:"#9CA3B8",letterSpacing:0.8,textTransform:"uppercase",textAlign:"right",borderBottom:"2px solid #E8ECF1"};
 var tdSt = {padding:"8px 12px",textAlign:"right",fontVariantNumeric:"tabular-nums",color:"#1A1F36",fontSize:12.5};
 
+// Formatting helpers
 function nF(v){return(v==null||isNaN(v))?"—":Math.round(v).toLocaleString();}
 function pF(v){return(v==null||isNaN(v))?"—":v.toFixed(1)+"%";}
 function a5(a,i){var s=Math.max(0,i-5);var sl=a.slice(s,i).filter(function(v){return v!=null;});return sl.length?sl.reduce(function(x,y){return x+y;},0)/sl.length:null;}
@@ -14,6 +16,7 @@ function vpct(c,a){return(c==null||a==null||a===0)?null:((c-a)/a)*100;}
 function vdel(c,a){return(c==null||a==null)?null:c-a;}
 function shortWk(w){return w.replace("W0","W")+" '26";}
 
+// Reusable Components
 function KPI({label,val,fmt,dv,pp}){
   var up=dv!=null&&dv>0.5,dn=dv!=null&&dv<-0.5,col=up?CC.grn:dn?CC.red:CC.txM;
   var ar=up?"▲":dn?"▼":"",isR=pp||fmt==="pct";
@@ -85,27 +88,35 @@ function PWChart({data}){
 }
 
 function StateTable({states,w,wkLabels}){
-  if(!states||Object.keys(states).length===0) return null;
+  if(!states || Object.keys(states).length === 0) return null;
   return(
-    <div style={{overflowX:"auto",borderRadius:10,border:"1px solid "+CC.bdr,background:CC.card}}>
+    <div style={{overflowX:"auto",borderRadius:10,border:"1px solid "+CC.bdr,background:CC.card, marginTop: "20px"}}>
       <table style={{width:"100%",borderCollapse:"collapse",fontFamily:FF,fontSize:12.5}}>
-        <thead><tr><th style={{...thS,textAlign:"left"}}>State</th><th style={thS}>Metric</th>
-          {wkLabels.map(function(wl,ci){return(<th key={ci} style={{...thS,minWidth:48,background:ci===w?"#EFF6FF":"transparent",color:ci===w?CC.blu:CC.txL}}>{wl}</th>);})}
-        </tr></thead>
-        <tbody>{Object.keys(states).map(function(st){
-          var d=states[st];var metrics=[{k:"gen",l:"Leads Gen"},{k:"rt",l:"Routed"},{k:"ts",l:"TL Sent"},{k:"tp",l:"% Sent",pct:true},{k:"cs",l:"Signed"},{k:"cr",l:"Conv %",pct:true}].filter(function(m){return d[m.k];});
-          return metrics.map(function(m,mi){return(
-            <tr key={st+m.k} style={{borderBottom:mi===metrics.length-1?"2px solid "+CC.bdr:"1px solid "+CC.bdrL}}>
-              {mi===0&&<td rowSpan={metrics.length} style={{padding:"8px 12px",fontWeight:700,color:CC.tx,fontSize:13,borderRight:"1px solid "+CC.bdr,verticalAlign:"top",background:"#FAFBFC"}}>{st}</td>}
-              <td style={{padding:"5px 10px",color:CC.tx2,fontSize:11,fontWeight:600,whiteSpace:"nowrap",borderRight:"1px solid "+CC.bdrL}}>{m.l}</td>
-              {(d[m.k]||[]).map(function(v,vi){return(<td key={vi} style={{padding:"5px 7px",textAlign:"right",fontVariantNumeric:"tabular-nums",color:m.k==="cs"&&v>0?CC.grn:m.k==="cr"&&v>10?CC.grn:m.k==="cr"&&v>0?CC.org:CC.tx,fontWeight:vi===w?700:400,background:vi===w?"#EFF6FF":"transparent",fontSize:11.5}}>{v==null?"—":m.pct?v.toFixed(1)+"%":typeof v==="number"?v.toLocaleString(undefined,{maximumFractionDigits:1}):"—"}</td>);})}
-            </tr>);});
-        })}</tbody>
+        <thead>
+          <tr>
+            <th style={{...thS,textAlign:"left"}}>State</th>
+            <th style={thS}>Metric</th>
+            {wkLabels.map(function(wl,ci){return(<th key={ci} style={{...thS,minWidth:48,background:ci===w?"#EFF6FF":"transparent",color:ci===w?CC.blu:CC.txL}}>{wl}</th>);})}
+          </tr>
+        </thead>
+        <tbody>
+          {Object.keys(states).map(function(st){
+            var d=states[st];
+            var metrics=[{k:"gen",l:"Leads Gen"},{k:"rt",l:"Routed"},{k:"ts",l:"TL Sent"},{k:"tp",l:"% Sent",pct:true},{k:"cs",l:"Signed"},{k:"cr",l:"Conv %",pct:true}].filter(function(m){return d[m.k];});
+            return metrics.map(function(m,mi){return(
+              <tr key={st+m.k} style={{borderBottom:mi===metrics.length-1?"2px solid "+CC.bdr:"1px solid "+CC.bdrL}}>
+                {mi===0 && <td rowSpan={metrics.length} style={{padding:"8px 12px",fontWeight:700,color:CC.tx,fontSize:13,borderRight:"1px solid "+CC.bdr,verticalAlign:"top",background:"#FAFBFC"}}>{st}</td>}
+                <td style={{padding:"5px 10px",color:CC.tx2,fontSize:11,fontWeight:600,whiteSpace:"nowrap",borderRight:"1px solid "+CC.bdrL}}>{m.l}</td>
+                {(d[m.k]||[]).map(function(v,vi){return(<td key={vi} style={{padding:"5px 7px",textAlign:"right",fontVariantNumeric:"tabular-nums",color:m.k==="cs"&&v>0?CC.grn:m.k==="cr"&&v>10?CC.grn:m.k==="cr"&&v>0?CC.org:CC.tx,fontWeight:vi===w?700:400,background:vi===w?"#EFF6FF":"transparent",fontSize:11.5}}>{v==null?"—":m.pct?v.toFixed(1)+"%":typeof v==="number"?v.toLocaleString(undefined,{maximumFractionDigits:1}):"—"}</td>);})}
+              </tr>);});
+          })}
+        </tbody>
       </table>
     </div>
   );
 }
 
+// Main Page Views
 function BizPage({name,d,w,color,soldLabel,showPW,wkLabels,states}){
   var sl=soldLabel||"Leads Sold";
   var cd=wkLabels.map(function(_,i){return{wk:wkLabels[i],gen:d.gen[i],sold:d.sold[i],sp:d.sp[i],tlS:d.tlS[i],tlC:d.tlC[i],tlR:d.tlR[i],pwS:d.pwS?d.pwS[i]:null,pwC:d.pwC?d.pwC[i]:null,pwR:d.pwR?d.pwR[i]:null};});
@@ -129,25 +140,12 @@ function BizPage({name,d,w,color,soldLabel,showPW,wkLabels,states}){
           <TLChart data={cd}/>
         </div>
       </div>
-      {showPW&&(<div style={{background:CC.card,borderRadius:10,border:"1px solid "+CC.bdr,padding:"18px 18px 10px",marginBottom:22}}>
+      {showPW && (<div style={{background:CC.card,borderRadius:10,border:"1px solid "+CC.bdr,padding:"18px 18px 10px",marginBottom:22}}>
         <div style={{fontSize:11,fontWeight:700,color:CC.txL,letterSpacing:0.8,textTransform:"uppercase",marginBottom:10,fontFamily:FF}}>Pacific Workers Pipeline & Conversion Rate</div>
         <PWChart data={cd}/>
       </div>)}
-      <div style={{overflowX:"auto",borderRadius:10,border:"1px solid "+CC.bdr,background:CC.card,marginBottom:22}}>
-        <table style={{width:"100%",borderCollapse:"collapse",fontFamily:FF,fontSize:12.5}}>
-          <thead><tr><th style={{...thS,textAlign:"left"}}></th><th colSpan={3} style={{...thS,textAlign:"center",background:"#FAFBFC"}}>Volume</th><th colSpan={3} style={{...thS,textAlign:"center"}}>TL Pipeline</th>{showPW&&<th colSpan={3} style={{...thS,textAlign:"center",background:"#FAFBFC"}}>PW Pipeline</th>}</tr>
-            <tr style={{borderBottom:"2px solid "+CC.bdr}}><th style={{...thS,textAlign:"left"}}>Week</th><th style={{...thS,background:"#FAFBFC"}}>Gen</th><th style={{...thS,background:"#FAFBFC"}}>Sold</th><th style={{...thS,background:"#FAFBFC"}}>Sold%</th><th style={thS}>Sent</th><th style={{...thS,color:CC.grn}}>Signed</th><th style={thS}>Conv%</th>{showPW&&(<><th style={{...thS,background:"#FAFBFC"}}>Sent</th><th style={{...thS,background:"#FAFBFC",color:CC.grn}}>Signed</th><th style={{...thS,background:"#FAFBFC"}}>Conv%</th></>)}</tr>
-          </thead>
-          <tbody>{[...wkLabels].map(function(_,ri){var i=wkLabels.length-1-ri;var sel=i===w;return(
-            <tr key={i} style={{borderBottom:"1px solid "+CC.bdrL,background:sel?"#EFF6FF":"transparent"}}>
-              <td style={{padding:"7px 12px",fontWeight:600,color:CC.tx,fontSize:12.5}}>{wkLabels[i]}</td>
-              <td style={{...tdSt,background:sel?"#EFF6FF":"#FAFBFC"}}>{nF(d.gen[i])}</td><td style={{...tdSt,background:sel?"#EFF6FF":"#FAFBFC"}}>{nF(d.sold[i])}</td><td style={{...tdSt,background:sel?"#EFF6FF":"#FAFBFC"}}>{pF(d.sp[i])}</td>
-              <td style={tdSt}>{nF(d.tlS[i])}</td><td style={{...tdSt,color:(d.tlC[i]||0)>0?CC.grn:CC.txM}}>{nF(d.tlC[i])}</td><td style={{...tdSt,color:(d.tlR[i]||0)>10?CC.grn:(d.tlR[i]||0)>0?CC.org:CC.txM}}>{pF(d.tlR[i])}</td>
-              {showPW&&(<><td style={{...tdSt,background:sel?"#EFF6FF":"#FAFBFC"}}>{nF(d.pwS?.[i])}</td><td style={{...tdSt,background:sel?"#EFF6FF":"#FAFBFC",color:(d.pwC?.[i]||0)>0?CC.grn:CC.txM}}>{nF(d.pwC?.[i])}</td><td style={{...tdSt,background:sel?"#EFF6FF":"#FAFBFC"}}>{pF(d.pwR?.[i])}</td></>)}
-            </tr>);})}</tbody>
-        </table>
-      </div>
-      {states&&Object.keys(states).length>0&&(<><div style={{fontSize:11,fontWeight:700,color:CC.txL,letterSpacing:0.8,textTransform:"uppercase",marginBottom:8,fontFamily:FF}}>By State</div><StateTable states={states} w={w} wkLabels={wkLabels}/></>)}
+      <div style={{fontSize:11,fontWeight:700,color:CC.txL,letterSpacing:0.8,textTransform:"uppercase",marginBottom:8,fontFamily:FF}}>By State</div>
+      <StateTable states={states} w={w} wkLabels={wkLabels}/>
     </div>
   );
 }
@@ -170,7 +168,9 @@ function MACombined({w,t1,t23,wkLabels,states}){
         <div style={{background:CC.card,borderRadius:10,border:"1px solid "+CC.bdr,padding:"18px 18px 10px"}}><div style={{fontSize:11,fontWeight:700,color:CC.txL,letterSpacing:0.8,textTransform:"uppercase",marginBottom:10,fontFamily:FF}}>Leads Volume & Sell-Through</div><LeadsChart data={cd1} color={CC.org}/></div>
         <div style={{background:CC.card,borderRadius:10,border:"1px solid "+CC.bdr,padding:"18px 18px 10px"}}><div style={{fontSize:11,fontWeight:700,color:CC.txL,letterSpacing:0.8,textTransform:"uppercase",marginBottom:10,fontFamily:FF}}>TL Pipeline & Conversion</div><TLChart data={cd1}/></div>
       </div>
-      {states&&Object.keys(states).length>0&&(<><div style={{fontSize:11,fontWeight:700,color:CC.txL,letterSpacing:0.8,textTransform:"uppercase",marginBottom:8,fontFamily:FF}}>Tier 1 — By State</div><StateTable states={states} w={w} wkLabels={wkLabels}/></>)}
+      <div style={{fontSize:11,fontWeight:700,color:CC.txL,letterSpacing:0.8,textTransform:"uppercase",marginBottom:8,fontFamily:FF}}>Tier 1 — By State</div>
+      <StateTable states={states} w={w} wkLabels={wkLabels}/>
+      
       <div style={{display:"flex",alignItems:"center",gap:10,marginTop:36,marginBottom:14}}><div style={{width:4,height:24,background:CC.pur,borderRadius:4}}/><h2 style={{fontSize:17,fontWeight:700,color:CC.tx,margin:0,fontFamily:FF}}>Tier 2/3</h2></div>
       <div style={{display:"flex",gap:12,marginBottom:20,flexWrap:"wrap"}}>
         <KPI label={"Leads Generated ("+wkLabels[w]+")"} val={t23.gen[w]} dv={vpct(t23.gen[w],a5(t23.gen,w))}/>
@@ -226,30 +226,18 @@ function Overview({w,data,wkLabels}){
           </ComposedChart></ResponsiveContainer>
         </div>
       </div>
-      <div style={{overflowX:"auto",borderRadius:10,border:"1px solid "+CC.bdr,background:CC.card}}>
-        <table style={{width:"100%",borderCollapse:"collapse",fontFamily:FF,fontSize:12.5}}>
-          <thead><tr style={{borderBottom:"2px solid "+CC.bdr}}>
-            <th style={{...thS,textAlign:"left"}}>Week</th><th style={{...thS,background:"#FAFBFC"}}>Total Gen</th><th style={{...thS,background:"#FAFBFC"}}>Total Sold</th><th style={{...thS,background:"#FAFBFC"}}>Sell-Through %</th><th style={thS}>Routed to TL</th><th style={{...thS,color:CC.grn}}>TL Signed</th><th style={thS}>Conv %</th>
-          </tr></thead>
-          <tbody>{[...wkLabels].map(function(_,ri){var i=wkLabels.length-1-ri;var x=cd[i];var sel=i===w;return(
-            <tr key={i} style={{borderBottom:"1px solid "+CC.bdrL,background:sel?"#EFF6FF":"transparent"}}>
-              <td style={{padding:"7px 12px",fontWeight:600,color:CC.tx,fontSize:12.5}}>{wkLabels[i]}</td>
-              <td style={{...tdSt,background:sel?"#EFF6FF":"#FAFBFC"}}>{nF(x.tg)}</td><td style={{...tdSt,background:sel?"#EFF6FF":"#FAFBFC"}}>{nF(x.ts)}</td><td style={{...tdSt,background:sel?"#EFF6FF":"#FAFBFC"}}>{pF(x.sp)}</td>
-              <td style={tdSt}>{nF(x.tSent)}</td><td style={{...tdSt,color:x.tSig>0?CC.grn:CC.txM}}>{nF(x.tSig)}</td><td style={{...tdSt,color:x.tConv>10?CC.grn:x.tConv>0?CC.org:CC.txM}}>{pF(x.tConv)}</td>
-            </tr>);})}</tbody>
-        </table>
-      </div>
     </div>
   );
 }
 
+// Final Page Shell
 export default function Home(){
-  var st=useState("overview"),pg=st[0],setPg=st[1];
-  var st2=useState(-1),w=st2[0],setW=st2[1];
-  var st3=useState(false),sc=st3[0],setSc=st3[1];
-  var st4=useState(null),data=st4[0],setData=st4[1];
-  var st5=useState(true),loading=st5[0],setLoading=st5[1];
-  var st6=useState(null),error=st6[0],setError=st6[1];
+  const [pg,setPg]=useState("overview");
+  const [w,setW]=useState(-1);
+  const [sc,setSc]=useState(false);
+  const [data,setData]=useState(null);
+  const [loading,setLoading]=useState(true);
+  const [error,setError]=useState(null);
 
   useEffect(function(){
     fetch("/api/data").then(function(r){return r.json();}).then(function(d){
@@ -267,7 +255,7 @@ export default function Home(){
   return(
     <><Head><title>Weekly Performance Report</title><link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet"/></Head>
     <div style={{display:"flex",minHeight:"100vh",background:CC.bg,fontFamily:FF}}>
-      {!sc&&(<div style={{width:210,minWidth:210,background:"#fff",borderRight:"1px solid "+CC.bdr,padding:"18px 12px",display:"flex",flexDirection:"column"}}>
+      {!sc && (<div style={{width:210,minWidth:210,background:"#fff",borderRight:"1px solid "+CC.bdr,padding:"18px 12px",display:"flex",flexDirection:"column"}}>
         <div style={{display:"flex",alignItems:"center",gap:10,padding:"0 6px",marginBottom:24}}>
           <div style={{width:32,height:32,borderRadius:8,background:"linear-gradient(135deg,#2563EB,#7C3AED)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:800,color:"#fff"}}>WR</div>
           <div><div style={{fontSize:13,fontWeight:800,color:CC.tx,lineHeight:1.1}}>Weekly Report</div><div style={{fontSize:10,color:CC.txM,fontWeight:500}}>Performance Analytics</div></div>
@@ -278,7 +266,6 @@ export default function Home(){
         {[{id:"lgm",l:"LGM"},{id:"spz",l:"SpringZip"},{id:"ma",l:"MyAccident"}].map(function(item){return(
           <button key={item.id} onClick={function(){setPg(item.id);}} style={{display:"flex",alignItems:"center",gap:9,width:"100%",padding:"7px 12px 7px 28px",borderRadius:7,border:"none",background:pg===item.id?"#EFF6FF":"transparent",color:pg===item.id?CC.blu:CC.tx2,cursor:"pointer",fontSize:13,fontWeight:pg===item.id?700:500,fontFamily:FF,textAlign:"left",marginBottom:1}}>{item.l}</button>
         );})}
-        <div style={{flex:1}}/>
       </div>)}
       <div style={{flex:1,overflow:"auto"}}>
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 28px",borderBottom:"1px solid "+CC.bdr,background:"#fff",position:"sticky",top:0,zIndex:50}}>
@@ -291,10 +278,10 @@ export default function Home(){
           </div>
         </div>
         <div style={{padding:"24px 28px 44px",maxWidth:1200}}>
-          {pg==="overview"&&<Overview w={w} data={data} wkLabels={wkLabels}/>}
-          {pg==="lgm"&&<BizPage name="LGM — Legal Growth Marketing" d={data.lgm} w={w} color={CC.org} showPW={true} wkLabels={wkLabels} states={data.lgmStates}/>}
-          {pg==="spz"&&<BizPage name="SpringZip" d={data.spz} w={w} color={CC.org} soldLabel="Sold (excl. LGM)" showPW={true} wkLabels={wkLabels} states={data.spzStates}/>}
-          {pg==="ma"&&<MACombined w={w} t1={data.maTier1} t23={data.maTier23} wkLabels={wkLabels} states={data.maStates}/>}
+          {pg==="overview" && <Overview w={w} data={data} wkLabels={wkLabels}/>}
+          {pg==="lgm" && <BizPage name="LGM — Legal Growth Marketing" d={data.lgm} w={w} color={CC.org} showPW={true} wkLabels={wkLabels} states={data.lgmStates}/>}
+          {pg==="spz" && <BizPage name="SpringZip" d={data.spz} w={w} color={CC.org} soldLabel="Sold (excl. LGM)" showPW={true} wkLabels={wkLabels} states={data.spzStates}/>}
+          {pg==="ma" && <MACombined w={w} t1={data.maTier1} t23={data.maTier23} wkLabels={wkLabels} states={data.maStates}/>}
         </div>
       </div>
     </div></>
