@@ -2,21 +2,18 @@ import { useState, useEffect } from "react";
 import Head from "next/head";
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, ComposedChart, Bar, Line } from "recharts";
 
-// Design Colors & Styles
 var CC = {bg:"#F7F8FA",card:"#FFF",bdr:"#E8ECF1",bdrL:"#F0F2F5",tx:"#1A1F36",tx2:"#5E6278",txM:"#8A92A6",txL:"#9CA3B8",grn:"#0D9F6E",red:"#E02D3C",org:"#D97706",blu:"#2563EB",pur:"#7C3AED"};
 var FF = "'Outfit','Avenir Next',system-ui,sans-serif";
 var thS = {padding:"8px 10px",fontSize:10,fontWeight:700,color:"#9CA3B8",letterSpacing:0.8,textTransform:"uppercase",textAlign:"right",borderBottom:"2px solid #E8ECF1"};
 var tdSt = {padding:"8px 12px",textAlign:"right",fontVariantNumeric:"tabular-nums",color:"#1A1F36",fontSize:12.5};
 
-// Formatting helpers
 function nF(v){return(v==null||isNaN(v))?"—":Math.round(v).toLocaleString();}
 function pF(v){return(v==null||isNaN(v))?"—":v.toFixed(1)+"%";}
 function a5(a,i){var s=Math.max(0,i-5);var sl=a.slice(s,i).filter(function(v){return v!=null;});return sl.length?sl.reduce(function(x,y){return x+y;},0)/sl.length:null;}
 function vpct(c,a){return(c==null||a==null||a===0)?null:((c-a)/a)*100;}
 function vdel(c,a){return(c==null||a==null)?null:c-a;}
-function shortWk(w){return w.replace("W0","W")+" '26";}
+function shortWk(w){return w.replace("W0","W")+" 26";}
 
-// Reusable Components
 function KPI({label,val,fmt,dv,pp}){
   var up=dv!=null&&dv>0.5,dn=dv!=null&&dv<-0.5,col=up?CC.grn:dn?CC.red:CC.txM;
   var ar=up?"▲":dn?"▼":"",isR=pp||fmt==="pct";
@@ -88,9 +85,9 @@ function PWChart({data}){
 }
 
 function StateTable({states,w,wkLabels}){
-  if(!states || Object.keys(states).length === 0) return null;
+  if(!states || Object.keys(states).length === 0) return <div style={{padding:"20px", color:CC.txM, fontSize:12}}>No state data found for this period.</div>;
   return(
-    <div style={{overflowX:"auto",borderRadius:10,border:"1px solid "+CC.bdr,background:CC.card, marginTop: "20px"}}>
+    <div style={{overflowX:"auto",borderRadius:10,border:"1px solid "+CC.bdr,background:CC.card, marginTop: "10px"}}>
       <table style={{width:"100%",borderCollapse:"collapse",fontFamily:FF,fontSize:12.5}}>
         <thead>
           <tr>
@@ -116,7 +113,6 @@ function StateTable({states,w,wkLabels}){
   );
 }
 
-// Main Page Views
 function BizPage({name,d,w,color,soldLabel,showPW,wkLabels,states}){
   var sl=soldLabel||"Leads Sold";
   var cd=wkLabels.map(function(_,i){return{wk:wkLabels[i],gen:d.gen[i],sold:d.sold[i],sp:d.sp[i],tlS:d.tlS[i],tlC:d.tlC[i],tlR:d.tlR[i],pwS:d.pwS?d.pwS[i]:null,pwC:d.pwC?d.pwC[i]:null,pwR:d.pwR?d.pwR[i]:null};});
@@ -140,11 +136,11 @@ function BizPage({name,d,w,color,soldLabel,showPW,wkLabels,states}){
           <TLChart data={cd}/>
         </div>
       </div>
-      {showPW && (<div style={{background:CC.card,borderRadius:10,border:"1px solid "+CC.bdr,padding:"18px 18px 10px",marginBottom:22}}>
+      {showPW && d.pwS && d.pwS.length > 0 && (<div style={{background:CC.card,borderRadius:10,border:"1px solid "+CC.bdr,padding:"18px 18px 10px",marginBottom:22}}>
         <div style={{fontSize:11,fontWeight:700,color:CC.txL,letterSpacing:0.8,textTransform:"uppercase",marginBottom:10,fontFamily:FF}}>Pacific Workers Pipeline & Conversion Rate</div>
         <PWChart data={cd}/>
       </div>)}
-      <div style={{fontSize:11,fontWeight:700,color:CC.txL,letterSpacing:0.8,textTransform:"uppercase",marginBottom:8,fontFamily:FF}}>By State</div>
+      <div style={{fontSize:11,fontWeight:700,color:CC.txL,letterSpacing:0.8,textTransform:"uppercase",marginBottom:8,fontFamily:FF,marginTop:30}}>By State</div>
       <StateTable states={states} w={w} wkLabels={wkLabels}/>
     </div>
   );
@@ -152,7 +148,6 @@ function BizPage({name,d,w,color,soldLabel,showPW,wkLabels,states}){
 
 function MACombined({w,t1,t23,wkLabels,states}){
   var cd1=wkLabels.map(function(_,i){return{wk:wkLabels[i],gen:t1.gen[i],sold:t1.sold[i],sp:t1.sp[i],tlS:t1.tlS[i],tlC:t1.tlC[i],tlR:t1.tlR[i]};});
-  var cd23=wkLabels.map(function(_,i){return{wk:wkLabels[i],gen:t23.gen[i],sold:t23.sold[i],sp:t23.sp[i]};});
   return(
     <div>
       <h1 style={{fontSize:24,fontWeight:700,color:CC.tx,margin:"0 0 4px",fontFamily:FF}}>MyAccident</h1>
@@ -164,20 +159,8 @@ function MACombined({w,t1,t23,wkLabels,states}){
         <KPI label="Sell-Through %" val={t1.sp[w]} fmt="pct" dv={vdel(t1.sp[w],a5(t1.sp,w))} pp/>
         <KPI label="TL Contracts" val={t1.tlC[w]} dv={vpct(t1.tlC[w],a5(t1.tlC,w))}/>
       </div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:22}}>
-        <div style={{background:CC.card,borderRadius:10,border:"1px solid "+CC.bdr,padding:"18px 18px 10px"}}><div style={{fontSize:11,fontWeight:700,color:CC.txL,letterSpacing:0.8,textTransform:"uppercase",marginBottom:10,fontFamily:FF}}>Leads Volume & Sell-Through</div><LeadsChart data={cd1} color={CC.org}/></div>
-        <div style={{background:CC.card,borderRadius:10,border:"1px solid "+CC.bdr,padding:"18px 18px 10px"}}><div style={{fontSize:11,fontWeight:700,color:CC.txL,letterSpacing:0.8,textTransform:"uppercase",marginBottom:10,fontFamily:FF}}>TL Pipeline & Conversion</div><TLChart data={cd1}/></div>
-      </div>
-      <div style={{fontSize:11,fontWeight:700,color:CC.txL,letterSpacing:0.8,textTransform:"uppercase",marginBottom:8,fontFamily:FF}}>Tier 1 — By State</div>
+      <div style={{fontSize:11,fontWeight:700,color:CC.txL,letterSpacing:0.8,textTransform:"uppercase",marginBottom:8,fontFamily:FF,marginTop:20}}>Tier 1 — By State</div>
       <StateTable states={states} w={w} wkLabels={wkLabels}/>
-      
-      <div style={{display:"flex",alignItems:"center",gap:10,marginTop:36,marginBottom:14}}><div style={{width:4,height:24,background:CC.pur,borderRadius:4}}/><h2 style={{fontSize:17,fontWeight:700,color:CC.tx,margin:0,fontFamily:FF}}>Tier 2/3</h2></div>
-      <div style={{display:"flex",gap:12,marginBottom:20,flexWrap:"wrap"}}>
-        <KPI label={"Leads Generated ("+wkLabels[w]+")"} val={t23.gen[w]} dv={vpct(t23.gen[w],a5(t23.gen,w))}/>
-        <KPI label="Leads Sold" val={t23.sold[w]} dv={vpct(t23.sold[w],a5(t23.sold,w))}/>
-        <KPI label="Sell-Through %" val={t23.sp[w]} fmt="pct" dv={vdel(t23.sp[w],a5(t23.sp,w))} pp/>
-      </div>
-      <div style={{background:CC.card,borderRadius:10,border:"1px solid "+CC.bdr,padding:"18px 18px 10px",marginBottom:22}}><div style={{fontSize:11,fontWeight:700,color:CC.txL,letterSpacing:0.8,textTransform:"uppercase",marginBottom:10,fontFamily:FF}}>Leads Volume & Sell-Through</div><LeadsChart data={cd23} color={CC.pur}/></div>
     </div>
   );
 }
@@ -230,7 +213,6 @@ function Overview({w,data,wkLabels}){
   );
 }
 
-// Final Page Shell
 export default function Home(){
   const [pg,setPg]=useState("overview");
   const [w,setW]=useState(-1);
@@ -280,7 +262,7 @@ export default function Home(){
         <div style={{padding:"24px 28px 44px",maxWidth:1200}}>
           {pg==="overview" && <Overview w={w} data={data} wkLabels={wkLabels}/>}
           {pg==="lgm" && <BizPage name="LGM — Legal Growth Marketing" d={data.lgm} w={w} color={CC.org} showPW={true} wkLabels={wkLabels} states={data.lgmStates}/>}
-          {pg==="spz" && <BizPage name="SpringZip" d={data.spz} w={w} color={CC.org} soldLabel="Sold (excl. LGM)" showPW={true} wkLabels={wkLabels} states={data.spzStates}/>}
+          {pg==="spz" && <BizPage name="SpringZip" d={data.spz} w={w} color={CC.org} soldLabel="Sold (excl. LGM)" showPW={false} wkLabels={wkLabels} states={data.spzStates}/>}
           {pg==="ma" && <MACombined w={w} t1={data.maTier1} t23={data.maTier23} wkLabels={wkLabels} states={data.maStates}/>}
         </div>
       </div>
