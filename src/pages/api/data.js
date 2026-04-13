@@ -1,8 +1,8 @@
 var SHEET_ID = "1b62arI2j6Who4j4SlmxM2J5gXVF34w6N1tNdGKS-Xes";
 
 async function fetchSheet(sheetName) {
-  var url = "https://docs.google.com/spreadsheets/d/" + SHEET_ID + "/gviz/tq?tqx=out:csv&sheet=" + encodeURIComponent(sheetName);
-  var res = await fetch(url);
+  var url = "https://docs.google.com/spreadsheets/d/" + SHEET_ID + "/gviz/tq?tqx=out:csv&sheet=" + encodeURIComponent(sheetName) + "&t=" + Date.now();
+  var res = await fetch(url, { cache: 'no-store' }); 
   return parseCSV(await res.text());
 }
 
@@ -76,7 +76,19 @@ function extractByState(rows) {
   var hdr = parseHeader(rows[0] || []);
   var cols = hdr.cols;
   var states = {};
-  var map = { "Leads Generated": "gen", "Leads Routed": "rt", "Leads Routed ": "rt", "Leads Routed (Excl. LGM)": "rt", "Leads Sent to TL": "ts", "% Sent to TL": "tp", "Contract Signed": "cs", "Conversion Rate": "cr", "Leads sent to PW": "ts", "% Sent to PW": "tp" };
+  // Added "Leads Routed (Excl. LGM)" and variations to match your Spz sheet exactly
+  var map = { 
+    "Leads Generated": "gen", 
+    "Leads Routed": "rt", 
+    "Leads Routed (Excl. LGM)": "rt",
+    "Leads Routed (Excl. LGM) ": "rt",
+    "Leads Sent to TL": "ts", 
+    "% Sent to TL": "tp", 
+    "Contract Signed": "cs", 
+    "Conversion Rate": "cr",
+    "Leads sent to PW": "ts",
+    "% Sent to PW": "tp"
+  };
   for (var r = 0; r < rows.length; r++) {
     var c0 = (rows[r][0] || "").trim();
     var c1 = (rows[r][1] || "").trim();
