@@ -3,14 +3,11 @@ var SHEET_ID = "1b62arI2j6Who4j4SlmxM2J5gXVF34w6N1tNdGKS-Xes";
 async function fetchSheet(sheetName) {
   var url = "https://docs.google.com/spreadsheets/d/" + SHEET_ID + "/gviz/tq?tqx=out:csv&sheet=" + encodeURIComponent(sheetName);
   var res = await fetch(url);
-  var text = await res.text();
-  return parseCSV(text);
+  return parseCSV(await res.text());
 }
 
 function parseCSV(text) {
-  var lines = [];
-  var current = "";
-  var inQ = false;
+  var lines = [], current = "", inQ = false;
   for (var i = 0; i < text.length; i++) {
     var ch = text[i];
     if (ch === '"') { inQ = !inQ; current += ch; }
@@ -20,10 +17,10 @@ function parseCSV(text) {
   if (current) lines.push(current);
   var rows = [];
   for (var li = 0; li < lines.length; li++) {
-    var cells = []; var cell = ""; var q = false;
+    var cells = [], cell = "", q = false;
     for (var j = 0; j < lines[li].length; j++) {
       var c = lines[li][j];
-      if (c === '"') { if (q && lines[li][j+1] === '"') { cell += '"'; j++; } else q = !q; }
+      if (c === '"') { if (q && lines[li][j + 1] === '"') { cell += '"'; j++; } else q = !q; }
       else if (c === "," && !q) { cells.push(cell.trim()); cell = ""; }
       else { cell += c; }
     }
@@ -35,96 +32,57 @@ function parseCSV(text) {
 
 function toNum(s) {
   if (!s || s === "" || s === "-" || s === "-%" || s === "#DIV/0!") return null;
-  var isPct = s.indexOf("%") >= 0;
-  var cleaned = s.replace(/[$,%\s]/g, "").replace(/,/g, "");
+  var cleaned = s.replace(/%/g, "").replace(/,/g, "").replace(/\$/g, "").trim();
   var n = parseFloat(cleaned);
-  if (isNaN(n)) return null;
-  return isPct ? n : n;
+  return isNaN(n) ? null : n;
 }
 
 function parseHeader(headerRow) {
-  var weeks = [];
-  var dateRanges = [];
-  var startCol = -1;
-  var endCol = -1;
+  var weeks = [], dateRanges = [], cols = [];
   for (var c = 1; c < headerRow.length; c++) {
     var val = (headerRow[c] || "").trim();
     if (!val) continue;
-    var m = val.match(/^(W\d+)\s+(\d{4})\s+(.+)$/);
-    if (m) {
-      var wk = m[1];
-      var yr = m[2];
-      var dr = m[3].trim();
-      if (yr === "2025") continue;
-      if (startCol === -1) startCol = c;
-      endCol = c;
-      weeks.push(wk);
-      dateRanges.push(dr);
-    }
+    var parts = val.split(" ", 2);
+    var wk = parts[0] || "";
+    var yr = parts[1] || "";
+    if (yr !== "2026") continue;
+    var rest = val.substring(wk.length + yr.length + 2).trim();
+    weeks.push(wk);
+    dateRanges.push(rest);
+    cols.push(c);
   }
-  return { weeks: weeks, dateRanges: dateRanges, startCol: startCol, endCol: endCol };
+  return { weeks: weeks, dateRanges: dateRanges, cols: cols };
 }
 
-function getVals(row, startCol, endCol) {
-  var vals = [];
-  for (var c = startCol; c <= endCol; c++) {
-    vals.push(toNum(row ? row[c] : null));
-  }
-  return vals;
+function getVals(row, cols) {
+  return cols.map(function (c) { return toNum(row ? row[c] : null); });
 }
 
-function extractTrend(rows) {
-  var hdr = parseHeader(rows[0] || []);
-  var sc = hdr.startCol;
-  var ec = hdr.endCol;
-
-  function section(baseRow) {
-    return {
-      gen: getVals(rows[baseRow + 1], sc, ec),
-      sold: getVals(rows[baseRow + 2], sc, ec),
-      sp: getVals(rows[baseRow + 3], sc, ec),
-      tlS: getVals(rows[baseRow + 4], sc, ec),
-      tlC: getVals(rows[baseRow + 5], sc, ec),
-      tlR: getVals(rows[baseRow + 6], sc, ec),
-      pwS: getVals(rows[baseRow + 7], sc, ec),
-      pwC: getVals(rows[baseRow + 8], sc, ec),
-      pwR: getVals(rows[baseRow + 9], sc, ec),
-    };
-  }
-
+function section(rows, baseRow, cols) {
   return {
-    weeks: hdr.weeks,
-    dateRanges: hdr.dateRanges,
-    lgm: section(0),
-    spz: section(10),
-    maTier1: section(21),
-    maTier23: section(31),
+    gen: getVals(rows[baseRow + 1], cols),
+    sold: getVals(rows[baseRow + 2], cols),
+    sp: getVals(rows[baseRow + 3], cols),
+    tlS: getVals(rows[baseRow + 4], cols),
+    tlC: getVals(rows[baseRow + 5], cols),
+    tlR: getVals(rows[baseRow + 6], cols),
+    pwS: getVals(rows[baseRow + 7], cols),
+    pwC: getVals(rows[baseRow + 8], cols),
+    pwR: getVals(rows[baseRow + 9], cols)
   };
 }
 
 function extractByState(rows) {
   var hdr = parseHeader(rows[0] || []);
-  var sc = hdr.startCol;
-  var ec = hdr.endCol;
+  var cols = hdr.cols;
   var states = {};
-  var metricMap = {
-    "Leads Generated": "gen",
-    "Leads Routed": "rt",
-    "Leads Routed ": "rt",
-    "Leads Routed (Excl. LGM)": "rt",
-    "Leads Sent to TL": "ts",
-    "% Sent to TL": "tp",
-    "Contract Signed": "cs",
-    "Conversion Rate": "cr",
-    "Leads sent to PW": "ts",
-    "% Sent to PW": "tp",
-  };
+  var map = { "Leads Generated": "gen", "Leads Routed": "rt", "Leads Routed ": "rt", "Leads Routed (Excl. LGM)": "rt", "Leads Sent to TL": "ts", "% Sent to TL": "tp", "Contract Signed": "cs", "Conversion Rate": "cr", "Leads sent to PW": "ts", "% Sent to PW": "tp" };
   for (var r = 0; r < rows.length; r++) {
-    var col0 = (rows[r] && rows[r][0] ? rows[r][0] : "").trim();
-    var col1 = (rows[r] && rows[r][1] ? rows[r][1] : "").trim();
-    if (col0 && /^[A-Z]{2}$/.test(col0) && col1 && metricMap[col1]) {
-      if (!states[col0]) states[col0] = {};
-      states[col0][metricMap[col1]] = getVals(rows[r], sc, ec);
+    var c0 = (rows[r][0] || "").trim();
+    var c1 = (rows[r][1] || "").trim();
+    if (c0 && /^[A-Z]{2}$/.test(c0) && c1 && map[c1]) {
+      if (!states[c0]) states[c0] = {};
+      states[c0][map[c1]] = getVals(rows[r], cols);
     }
   }
   return states;
@@ -132,26 +90,28 @@ function extractByState(rows) {
 
 export default async function handler(req, res) {
   try {
-    var results = await Promise.all([
+    var sheets = await Promise.all([
       fetchSheet("Weekly Performance Trend"),
       fetchSheet("LGM"),
       fetchSheet("SpringZip"),
-      fetchSheet("MyAccident"),
+      fetchSheet("MyAccident")
     ]);
-    var trend = extractTrend(results[0]);
+    var trend = sheets[0];
+    var hdr = parseHeader(trend[0] || []);
+    var c = hdr.cols;
     res.status(200).json({
-      weeks: trend.weeks,
-      dateRanges: trend.dateRanges,
-      lgm: trend.lgm,
-      spz: trend.spz,
-      maTier1: trend.maTier1,
-      maTier23: trend.maTier23,
-      lgmStates: extractByState(results[1]),
-      spzStates: extractByState(results[2]),
-      maStates: extractByState(results[3]),
-      lastUpdated: new Date().toISOString(),
+      weeks: hdr.weeks,
+      dateRanges: hdr.dateRanges,
+      lgm: section(trend, 0, c),
+      spz: section(trend, 10, c),
+      maTier1: section(trend, 21, c),
+      maTier23: section(trend, 31, c),
+      lgmStates: extractByState(sheets[1]),
+      spzStates: extractByState(sheets[2]),
+      maStates: extractByState(sheets[3]),
+      lastUpdated: new Date().toISOString()
     });
-  } catch (error) {
-    res.status(500).json({ error: "Failed to fetch data", details: error.message });
+  } catch (e) {
+    res.status(500).json({ error: "Failed to fetch data", details: e.message });
   }
 }
