@@ -54,47 +54,84 @@ function parseHeader(headerRow) {
   return { weeks: weeks, dateRanges: dateRanges, cols: cols };
 }
 
-function getVals(row, cols) {
-  return cols.map(function (c) { return toNum(row ? row[c] : null); });
+function findMetricRow(rows, sectionName, metricName, startRow) {
+  var foundSection = sectionName === null;
+  for (var i = startRow || 0; i < rows.length; i++) {
+    var label = (rows[i][0] || "").trim();
+    if (!foundSection && label.toLowerCase().includes(sectionName.toLowerCase())) {
+        foundSection = true;
+        continue;
+    }
+    if (foundSection && label.toLowerCase().includes(metricName.toLowerCase())) {
+        return i;
+    }
+  }
+  return -1;
 }
 
-function section(rows, baseRow, cols) {
+function section(rows, title, cols) {
+  var start = 0;
+  if (title) {
+    for (var i = 0; i < rows.length; i++) {
+        if ((rows[i][0] || "").trim().toLowerCase() === title.toLowerCase()) { start = i; break; }
+    }
+  }
+  var rGen = findMetricRow(rows, null, "Leads Generated", start);
+  var rSold = findMetricRow(rows, null, "Leads Sold", rGen);
+  var rSP = findMetricRow(rows, null, "Sold %", rSold);
+  var rTL_S = findMetricRow(rows, null, "Sent to TL", rSP);
+  var rTL_C = findMetricRow(rows, null, "Contract Signed", rTL_S);
+  var rTL_R = findMetricRow(rows, null, "Conversion rate", rTL_C);
+  var rPW_S = findMetricRow(rows, null, "Sent to Pacific", rTL_R);
+  var rPW_C = findMetricRow(rows, null, "Contract Signed", rPW_S);
+  var rPW_R = findMetricRow(rows, null, "Conversion rate", rPW_C);
+
   return {
-    gen: getVals(rows[baseRow + 1], cols),
-    sold: getVals(rows[baseRow + 2], cols),
-    sp: getVals(rows[baseRow + 3], cols),
-    tlS: getVals(rows[baseRow + 4], cols),
-    tlC: getVals(rows[baseRow + 5], cols),
-    tlR: getVals(rows[baseRow + 6], cols),
-    pwS: getVals(rows[baseRow + 7], cols),
-    pwC: getVals(rows[baseRow + 8], cols),
-    pwR: getVals(rows[baseRow + 9], cols)
+    gen: rGen !== -1 ? cols.map(c => toNum(rows[rGen][c])) : [],
+    sold: rSold !== -1 ? cols.map(c => toNum(rows[rSold][c])) : [],
+    sp: rSP !== -1 ? cols.map(c => toNum(rows[rSP][c])) : [],
+    tlS: rTL_S !== -1 ? cols.map(c => toNum(rows[rTL_S][c])) : [],
+    tlC: rTL_C !== -1 ? cols.map(c => toNum(rows[rTL_C][c])) : [],
+    tlR: rTL_R !== -1 ? cols.map(c => toNum(rows[rTL_R][c])) : [],
+    pwS: rPW_S !== -1 ? cols.map(c => toNum(rows[rPW_S][c])) : [],
+    pwC: rPW_C !== -1 ? cols.map(c => toNum(rows[rPW_C][c])) : [],
+    pwR: rPW_R !== -1 ? cols.map(c => toNum(rows[rPW_R][c])) : []
   };
 }
 
 function extractByState(rows) {
-  var hdr = parseHeader(rows[0] || []);
+  var hdr = parseHeader(rows[0] || rows[1] || []);
   var cols = hdr.cols;
   var states = {};
-  // Added "Leads Routed (Excl. LGM)" and variations to match your Spz sheet exactly
   var map = { 
-    "Leads Generated": "gen", 
-    "Leads Routed": "rt", 
-    "Leads Routed (Excl. LGM)": "rt",
-    "Leads Routed (Excl. LGM) ": "rt",
-    "Leads Sent to TL": "ts", 
-    "% Sent to TL": "tp", 
-    "Contract Signed": "cs", 
-    "Conversion Rate": "cr",
-    "Leads sent to PW": "ts",
-    "% Sent to PW": "tp"
+    "leads generated": "gen", 
+    "leads routed": "rt", 
+    "excl. lgm": "rt",
+    "leads sent to tl": "ts", 
+    "% sent to tl": "tp", 
+    "contract signed": "cs", 
+    "conversion rate": "cr",
+    "leads sent to pw": "ts",
+    "% sent to pw": "tp"
   };
+  
+  var currentState = null;
   for (var r = 0; r < rows.length; r++) {
     var c0 = (rows[r][0] || "").trim();
     var c1 = (rows[r][1] || "").trim();
-    if (c0 && /^[A-Z]{2}$/.test(c0) && c1 && map[c1]) {
-      if (!states[c0]) states[c0] = {};
-      states[c0][map[c1]] = getVals(rows[r], cols);
+    
+    // Check if Column A or B is a state code (TX, AZ, etc)
+    if (/^[A-Z]{2}$/.test(c0)) currentState = c0;
+    else if (/^[A-Z]{2}$/.test(c1)) currentState = c1;
+
+    if (currentState) {
+      var searchLabel = (c0 + " " + c1).toLowerCase();
+      for (var key in map) {
+        if (searchLabel.includes(key)) {
+          if (!states[currentState]) states[currentState] = {};
+          states[currentState][map[key]] = cols.map(c => toNum(rows[r][c]));
+        }
+      }
     }
   }
   return states;
@@ -114,10 +151,10 @@ export default async function handler(req, res) {
     res.status(200).json({
       weeks: hdr.weeks,
       dateRanges: hdr.dateRanges,
-      lgm: section(trend, 0, c),
-      spz: section(trend, 10, c),
-      maTier1: section(trend, 21, c),
-      maTier23: section(trend, 31, c),
+      lgm: section(trend, "LGM", c),
+      spz: section(trend, "SpringZip", c),
+      maTier1: section(trend, "Tier 1", c),
+      maTier23: section(trend, "Tier 2/3", c),
       lgmStates: extractByState(sheets[1]),
       spzStates: extractByState(sheets[2]),
       maStates: extractByState(sheets[3]),
