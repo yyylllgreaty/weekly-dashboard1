@@ -76,13 +76,36 @@ function extractByState(rows) {
   var hdr = parseHeader(rows[0] || []);
   var cols = hdr.cols;
   var states = {};
-  var map = { "Leads Generated": "gen", "Leads Routed": "rt", "Leads Routed ": "rt", "Leads Routed (Excl. LGM)": "rt", "Leads Sent to TL": "ts", "% Sent to TL": "tp", "Contract Signed": "cs", "Conversion Rate": "cr", "Leads sent to PW": "ts", "% Sent to PW": "tp" };
+  var metricNames = {
+    "Leads Generated": "gen",
+    "Leads Routed": "rt",
+    "Leads Routed ": "rt",
+    "Leads Routed (Excl. LGM)": "rt",
+    "Leads Sent to TL": "ts",
+    "% Sent to TL": "tp",
+    "Contract Signed": "cs",
+    "Conversion Rate": "cr",
+    "Leads sent to PW": "ts",
+    "% Sent to PW": "tp"
+  };
+  var currentState = null;
   for (var r = 0; r < rows.length; r++) {
     var c0 = (rows[r][0] || "").trim();
     var c1 = (rows[r][1] || "").trim();
-    if (c0 && /^[A-Z]{2}$/.test(c0) && c1 && map[c1]) {
+    if (c0 && /^[A-Z]{2}$/.test(c0) && c1 && metricNames[c1]) {
       if (!states[c0]) states[c0] = {};
-      states[c0][map[c1]] = getVals(rows[r], cols);
+      states[c0][metricNames[c1]] = getVals(rows[r], cols);
+      currentState = c0;
+    } else if (c0 && /^[A-Z]{2}$/.test(c0) && c1) {
+      currentState = c0;
+    } else if (!c0 && c1) {
+      var stMatch = c1.match(/^([A-Z]{2})\s/);
+      if (stMatch && (c1.indexOf("Vehicle") >= 0 || c1.indexOf("Workers") >= 0 || /^[A-Z]{2}\s*$/.test(c1))) {
+        currentState = stMatch[1];
+      } else if (currentState && metricNames[c1]) {
+        if (!states[currentState]) states[currentState] = {};
+        states[currentState][metricNames[c1]] = getVals(rows[r], cols);
+      }
     }
   }
   return states;
