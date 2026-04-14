@@ -48,8 +48,7 @@ function LeadsChart({data,color,soldLabel}){
     <XAxis dataKey="wk" tick={{fill:CC.txM,fontSize:10,fontFamily:FF}} axisLine={{stroke:CC.bdr}} tickLine={false}/>
     <YAxis yAxisId="l" tick={{fill:CC.txM,fontSize:10}} axisLine={false} tickLine={false}/>
     <YAxis yAxisId="r" orientation="right" tick={{fill:CC.grn,fontSize:10}} axisLine={false} tickLine={false} tickFormatter={function(v){return v+"%";}} domain={[0,100]}/>
-    <Tooltip content={<ChartTip/>}/>
-    <Legend wrapperStyle={{fontSize:11,fontFamily:FF,paddingTop:4}}/>
+    <Tooltip content={<ChartTip/>}/><Legend wrapperStyle={{fontSize:11,fontFamily:FF,paddingTop:4}}/>
     <Bar yAxisId="l" dataKey="gen" name="Generated" fill={color} radius={[3,3,0,0]} barSize={16} opacity={0.85}/>
     <Bar yAxisId="l" dataKey="sold" name={soldLabel||"Sold"} fill={CC.blu} radius={[3,3,0,0]} barSize={16} opacity={0.7}/>
     <Line yAxisId="r" type="monotone" dataKey="sp" name="Sell-Through %" stroke={CC.grn} strokeWidth={2.5} dot={{r:2.5,fill:CC.grn}}/>
@@ -62,8 +61,7 @@ function TLChart({data}){
     <XAxis dataKey="wk" tick={{fill:CC.txM,fontSize:10,fontFamily:FF}} axisLine={{stroke:CC.bdr}} tickLine={false}/>
     <YAxis yAxisId="l" tick={{fill:CC.txM,fontSize:10}} axisLine={false} tickLine={false}/>
     <YAxis yAxisId="r" orientation="right" tick={{fill:CC.pur,fontSize:10}} axisLine={false} tickLine={false} tickFormatter={function(v){return v+"%";}}/>
-    <Tooltip content={<ChartTip/>}/>
-    <Legend wrapperStyle={{fontSize:11,fontFamily:FF,paddingTop:4}}/>
+    <Tooltip content={<ChartTip/>}/><Legend wrapperStyle={{fontSize:11,fontFamily:FF,paddingTop:4}}/>
     <Bar yAxisId="l" dataKey="tlS" name="Routed to TL" fill={CC.blu} radius={[3,3,0,0]} barSize={16} opacity={0.6}/>
     <Bar yAxisId="l" dataKey="tlC" name="Contracts Signed" fill={CC.grn} radius={[3,3,0,0]} barSize={16}/>
     <Line yAxisId="r" type="monotone" dataKey="tlR" name="Conv Rate %" stroke={CC.pur} strokeWidth={2.5} dot={{r:2.5,fill:CC.pur}}/>
@@ -71,13 +69,12 @@ function TLChart({data}){
 }
 
 function PWChart({data}){
-  return(<ResponsiveContainer width="100%" height={220}><ComposedChart data={data} barGap={2}>
+  return(<ResponsiveContainer width="100%" height={250}><ComposedChart data={data} barGap={2}>
     <CartesianGrid strokeDasharray="3 3" stroke={CC.bdrL} vertical={false}/>
     <XAxis dataKey="wk" tick={{fill:CC.txM,fontSize:10,fontFamily:FF}} axisLine={{stroke:CC.bdr}} tickLine={false}/>
     <YAxis yAxisId="l" tick={{fill:CC.txM,fontSize:10}} axisLine={false} tickLine={false}/>
     <YAxis yAxisId="r" orientation="right" tick={{fill:CC.org,fontSize:10}} axisLine={false} tickLine={false} tickFormatter={function(v){return v+"%";}}/>
-    <Tooltip content={<ChartTip/>}/>
-    <Legend wrapperStyle={{fontSize:11,fontFamily:FF,paddingTop:4}}/>
+    <Tooltip content={<ChartTip/>}/><Legend wrapperStyle={{fontSize:11,fontFamily:FF,paddingTop:4}}/>
     <Bar yAxisId="l" dataKey="pwS" name="Sent to PW" fill={CC.org} radius={[3,3,0,0]} barSize={16} opacity={0.6}/>
     <Bar yAxisId="l" dataKey="pwC" name="PW Signed" fill={CC.grn} radius={[3,3,0,0]} barSize={16}/>
     <Line yAxisId="r" type="monotone" dataKey="pwR" name="Conv Rate %" stroke={CC.red} strokeWidth={2.5} dot={{r:2.5,fill:CC.red}} connectNulls={false}/>
@@ -119,20 +116,30 @@ function BizPage({name,d,w,color,soldLabel,showPW,wkLabels,states}){
         <KPI label="Sell-Through %" val={d.sp[w]} fmt="pct" dv={vdel(d.sp[w],a5(d.sp,w))} pp/>
         <KPI label="TL Contracts Signed" val={d.tlC[w]} dv={vpct(d.tlC[w],a5(d.tlC,w))}/>
       </div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:22}}>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:14}}>
         <div style={{background:CC.card,borderRadius:10,border:"1px solid "+CC.bdr,padding:"18px 18px 10px"}}>
           <div style={{fontSize:11,fontWeight:700,color:CC.txL,letterSpacing:0.8,textTransform:"uppercase",marginBottom:10,fontFamily:FF}}>Leads Volume & Sell-Through Rate</div>
           <LeadsChart data={cd} color={color} soldLabel={sl}/>
         </div>
-        <div style={{background:CC.card,borderRadius:10,border:"1px solid "+CC.bdr,padding:"18px 18px 10px"}}>
+        {showPW ? (
+          <div style={{background:CC.card,borderRadius:10,border:"1px solid "+CC.bdr,padding:"18px 18px 10px"}}>
+            <div style={{fontSize:11,fontWeight:700,color:CC.txL,letterSpacing:0.8,textTransform:"uppercase",marginBottom:10,fontFamily:FF}}>Pacific Workers Pipeline & Conversion Rate</div>
+            <PWChart data={cd}/>
+          </div>
+        ) : (
+          <div style={{background:CC.card,borderRadius:10,border:"1px solid "+CC.bdr,padding:"18px 18px 10px"}}>
+            <div style={{fontSize:11,fontWeight:700,color:CC.txL,letterSpacing:0.8,textTransform:"uppercase",marginBottom:10,fontFamily:FF}}>TL Pipeline & Conversion Rate</div>
+            <TLChart data={cd}/>
+          </div>
+        )}
+      </div>
+      {showPW && (
+        <div style={{background:CC.card,borderRadius:10,border:"1px solid "+CC.bdr,padding:"18px 18px 10px",marginBottom:22}}>
           <div style={{fontSize:11,fontWeight:700,color:CC.txL,letterSpacing:0.8,textTransform:"uppercase",marginBottom:10,fontFamily:FF}}>TL Pipeline & Conversion Rate</div>
           <TLChart data={cd}/>
         </div>
-      </div>
-      {showPW&&(<div style={{background:CC.card,borderRadius:10,border:"1px solid "+CC.bdr,padding:"18px 18px 10px",marginBottom:22}}>
-        <div style={{fontSize:11,fontWeight:700,color:CC.txL,letterSpacing:0.8,textTransform:"uppercase",marginBottom:10,fontFamily:FF}}>Pacific Workers Pipeline & Conversion Rate</div>
-        <PWChart data={cd}/>
-      </div>)}
+      )}
+      {!showPW && <div style={{marginBottom:22}}/>}
       <div style={{overflowX:"auto",borderRadius:10,border:"1px solid "+CC.bdr,background:CC.card,marginBottom:22}}>
         <table style={{width:"100%",borderCollapse:"collapse",fontFamily:FF,fontSize:12.5}}>
           <thead><tr><th style={{...thS,textAlign:"left"}}></th><th colSpan={3} style={{...thS,textAlign:"center",background:"#FAFBFC"}}>Volume</th><th colSpan={3} style={{...thS,textAlign:"center"}}>TL Pipeline</th>{showPW&&<th colSpan={3} style={{...thS,textAlign:"center",background:"#FAFBFC"}}>PW Pipeline</th>}</tr>
@@ -166,10 +173,11 @@ function MACombined({w,t1,t23,wkLabels,states}){
         <KPI label="Sell-Through %" val={t1.sp[w]} fmt="pct" dv={vdel(t1.sp[w],a5(t1.sp,w))} pp/>
         <KPI label="TL Contracts" val={t1.tlC[w]} dv={vpct(t1.tlC[w],a5(t1.tlC,w))}/>
       </div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:22}}>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:14}}>
         <div style={{background:CC.card,borderRadius:10,border:"1px solid "+CC.bdr,padding:"18px 18px 10px"}}><div style={{fontSize:11,fontWeight:700,color:CC.txL,letterSpacing:0.8,textTransform:"uppercase",marginBottom:10,fontFamily:FF}}>Leads Volume & Sell-Through</div><LeadsChart data={cd1} color={CC.org}/></div>
         <div style={{background:CC.card,borderRadius:10,border:"1px solid "+CC.bdr,padding:"18px 18px 10px"}}><div style={{fontSize:11,fontWeight:700,color:CC.txL,letterSpacing:0.8,textTransform:"uppercase",marginBottom:10,fontFamily:FF}}>TL Pipeline & Conversion</div><TLChart data={cd1}/></div>
       </div>
+      <div style={{marginBottom:22}}/>
       {states&&Object.keys(states).length>0&&(<><div style={{fontSize:11,fontWeight:700,color:CC.txL,letterSpacing:0.8,textTransform:"uppercase",marginBottom:8,fontFamily:FF}}>Tier 1 — By State</div><StateTable states={states} w={w} wkLabels={wkLabels}/></>)}
       <div style={{display:"flex",alignItems:"center",gap:10,marginTop:36,marginBottom:14}}><div style={{width:4,height:24,background:CC.pur,borderRadius:4}}/><h2 style={{fontSize:17,fontWeight:700,color:CC.tx,margin:0,fontFamily:FF}}>Tier 2/3</h2></div>
       <div style={{display:"flex",gap:12,marginBottom:20,flexWrap:"wrap"}}>
@@ -202,7 +210,7 @@ function Overview({w,data,wkLabels}){
         <KPI label="Sell-Through %" val={c.sp} fmt="pct" dv={vdel(c.sp,a5(spa,w))} pp/>
         <KPI label="TL Contracts Signed" val={c.tSig} dv={vpct(c.tSig,a5(tca,w))}/>
       </div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:22}}>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:14}}>
         <div style={{background:CC.card,borderRadius:10,border:"1px solid "+CC.bdr,padding:"18px 18px 10px"}}>
           <div style={{fontSize:11,fontWeight:700,color:CC.txL,letterSpacing:0.8,textTransform:"uppercase",marginBottom:10,fontFamily:FF}}>Leads Sold by Business</div>
           <ResponsiveContainer width="100%" height={250}><ComposedChart data={cd} barGap={1}>
@@ -226,6 +234,7 @@ function Overview({w,data,wkLabels}){
           </ComposedChart></ResponsiveContainer>
         </div>
       </div>
+      <div style={{marginBottom:22}}/>
       <div style={{overflowX:"auto",borderRadius:10,border:"1px solid "+CC.bdr,background:CC.card}}>
         <table style={{width:"100%",borderCollapse:"collapse",fontFamily:FF,fontSize:12.5}}>
           <thead><tr style={{borderBottom:"2px solid "+CC.bdr}}>
@@ -258,19 +267,19 @@ export default function Home(){
     }).catch(function(e){setError(e.message);setLoading(false);});
   },[]);
 
-  if(loading) return(<div style={{display:"flex",alignItems:"center",justifyContent:"center",minHeight:"100vh",background:CC.bg,fontFamily:FF}}><div style={{textAlign:"center"}}><div style={{width:40,height:40,borderRadius:10,background:"linear-gradient(135deg,#2563EB,#7C3AED)",margin:"0 auto 16px",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,fontWeight:800,color:"#fff"}}>WR</div><div style={{fontSize:16,fontWeight:600,color:CC.tx}}>Loading dashboard...</div></div></div>);
+  if(loading) return(<div style={{display:"flex",alignItems:"center",justifyContent:"center",minHeight:"100vh",background:CC.bg,fontFamily:FF}}><div style={{textAlign:"center"}}><div style={{width:40,height:40,borderRadius:10,background:"linear-gradient(135deg,#2563EB,#7C3AED)",margin:"0 auto 16px",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,fontWeight:800,color:"#fff"}}>LG</div><div style={{fontSize:16,fontWeight:600,color:CC.tx}}>Loading dashboard...</div></div></div>);
   if(error) return(<div style={{display:"flex",alignItems:"center",justifyContent:"center",minHeight:"100vh",background:CC.bg,fontFamily:FF}}><div style={{textAlign:"center",maxWidth:400}}><div style={{fontSize:16,fontWeight:600,color:CC.red,marginBottom:8}}>Error loading data</div><div style={{fontSize:13,color:CC.tx2}}>{error}</div></div></div>);
   if(!data||w<0) return null;
 
   var wkLabels=data.weeks.map(shortWk);
 
   return(
-    <><Head><title>Weekly Performance Report</title><link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet"/></Head>
+    <><Head><title>Lead Gen BUs Performance Dashboard</title><link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet"/></Head>
     <div style={{display:"flex",minHeight:"100vh",background:CC.bg,fontFamily:FF}}>
       {!sc&&(<div style={{width:210,minWidth:210,background:"#fff",borderRight:"1px solid "+CC.bdr,padding:"18px 12px",display:"flex",flexDirection:"column"}}>
         <div style={{display:"flex",alignItems:"center",gap:10,padding:"0 6px",marginBottom:24}}>
-          <div style={{width:32,height:32,borderRadius:8,background:"linear-gradient(135deg,#2563EB,#7C3AED)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:800,color:"#fff"}}>WR</div>
-          <div><div style={{fontSize:13,fontWeight:800,color:CC.tx,lineHeight:1.1}}>Weekly Report</div><div style={{fontSize:10,color:CC.txM,fontWeight:500}}>Performance Analytics</div></div>
+          <div style={{width:32,height:32,borderRadius:8,background:"linear-gradient(135deg,#2563EB,#7C3AED)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:800,color:"#fff"}}>LG</div>
+          <div><div style={{fontSize:12,fontWeight:800,color:CC.tx,lineHeight:1.2}}>Lead Gen BUs</div><div style={{fontSize:10,color:CC.txM,fontWeight:500}}>Performance Dashboard</div></div>
         </div>
         <div style={{fontSize:10,fontWeight:700,color:CC.txL,letterSpacing:1.1,textTransform:"uppercase",padding:"0 8px",marginBottom:6}}>Dashboard</div>
         <button onClick={function(){setPg("overview");}} style={{display:"flex",alignItems:"center",gap:9,width:"100%",padding:"8px 14px",borderRadius:7,border:"none",background:pg==="overview"?"#EFF6FF":"transparent",color:pg==="overview"?CC.blu:CC.tx2,cursor:"pointer",fontSize:13,fontWeight:pg==="overview"?700:500,fontFamily:FF,textAlign:"left",marginBottom:1}}>Overview</button>
