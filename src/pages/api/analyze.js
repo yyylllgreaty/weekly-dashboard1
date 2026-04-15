@@ -137,7 +137,7 @@ export default async function handler(req, res) {
     if (!response.ok) {
       var errText = await response.text();
       console.error("Claude API error:", errText);
-      return res.status(500).json({ error: "Claude API request failed" });
+      return res.status(500).json({ error: "Claude API request failed: " + errText.substring(0, 500) });
     }
 
     var apiData = await response.json();
