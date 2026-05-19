@@ -81,21 +81,65 @@ function PWChart({data}){
   </ComposedChart></ResponsiveContainer>);
 }
 
-function StateTable({states,w,wkLabels}){
+/* ── STATE TABLE ──
+   Fix 1: Only show 2026 weeks (skip 2025)
+   Fix 2: Freeze State + Metric columns (sticky)
+   Fix 3: Show % Sent from tp field
+   Fix 4: TL Sent as whole number
+*/
+function StateTable({states,w,wkLabels,allWeeks}){
   if(!states||Object.keys(states).length===0) return null;
+
+  // Find index of first 2026 week
+  var startIdx = 0;
+  for (var i = 0; i < (allWeeks||[]).length; i++) {
+    if (/2026/.test(allWeeks[i])) { startIdx = i; break; }
+  }
+
+  // Filter to only 2026 weeks
+  var filteredIndices = [];
+  for (var i = startIdx; i < wkLabels.length; i++) filteredIndices.push(i);
+  var filteredLabels = filteredIndices.map(function(i){return wkLabels[i];});
+  // Map selected week to filtered index
+  var filteredW = -1;
+  for (var fi = 0; fi < filteredIndices.length; fi++) {
+    if (filteredIndices[fi] === w) { filteredW = fi; break; }
+  }
+
+  var stickyState = {position:"sticky",left:0,zIndex:2,background:"#FAFBFC",padding:"8px 12px",fontWeight:700,color:CC.tx,fontSize:13,borderRight:"1px solid "+CC.bdr,verticalAlign:"top"};
+  var stickyMetric = {position:"sticky",left:68,zIndex:2,background:"#fff",padding:"5px 10px",color:CC.tx2,fontSize:11,fontWeight:600,whiteSpace:"nowrap",borderRight:"1px solid "+CC.bdrL};
+
   return(
     <div style={{overflowX:"auto",borderRadius:10,border:"1px solid "+CC.bdr,background:CC.card}}>
       <table style={{width:"100%",borderCollapse:"collapse",fontFamily:FF,fontSize:12.5}}>
-        <thead><tr><th style={{...thS,textAlign:"left"}}>State</th><th style={thS}>Metric</th>
-          {wkLabels.map(function(wl,ci){return(<th key={ci} style={{...thS,minWidth:48,background:ci===w?"#EFF6FF":"transparent",color:ci===w?CC.blu:CC.txL}}>{wl}</th>);})}
+        <thead><tr>
+          <th style={{...thS,textAlign:"left",position:"sticky",left:0,zIndex:3,background:"#fff",minWidth:68}}>State</th>
+          <th style={{...thS,textAlign:"left",position:"sticky",left:68,zIndex:3,background:"#fff",minWidth:80}}>Metric</th>
+          {filteredLabels.map(function(wl,ci){return(<th key={ci} style={{...thS,minWidth:48,background:ci===filteredW?"#EFF6FF":"transparent",color:ci===filteredW?CC.blu:CC.txL}}>{wl}</th>);})}
         </tr></thead>
         <tbody>{Object.keys(states).map(function(st){
-          var d=states[st];var metrics=[{k:"gen",l:"Leads Gen"},{k:"rt",l:"Routed"},{k:"ts",l:"TL Sent"},{k:"tp",l:"% Sent",pct:true},{k:"cs",l:"Signed"},{k:"cr",l:"Conv %",pct:true}].filter(function(m){return d[m.k];});
+          var d=states[st];
+          var metrics=[
+            {k:"gen",l:"Leads Gen"},
+            {k:"rt",l:"Routed"},
+            {k:"ts",l:"TL Sent"},
+            {k:"tp",l:"% Sent",pct:true},
+            {k:"cs",l:"Signed"},
+            {k:"cr",l:"Conv %",pct:true}
+          ].filter(function(m){return d[m.k] && d[m.k].length > 0;});
           return metrics.map(function(m,mi){return(
             <tr key={st+m.k} style={{borderBottom:mi===metrics.length-1?"2px solid "+CC.bdr:"1px solid "+CC.bdrL}}>
-              {mi===0&&<td rowSpan={metrics.length} style={{padding:"8px 12px",fontWeight:700,color:CC.tx,fontSize:13,borderRight:"1px solid "+CC.bdr,verticalAlign:"top",background:"#FAFBFC"}}>{st}</td>}
-              <td style={{padding:"5px 10px",color:CC.tx2,fontSize:11,fontWeight:600,whiteSpace:"nowrap",borderRight:"1px solid "+CC.bdrL}}>{m.l}</td>
-              {(d[m.k]||[]).map(function(v,vi){return(<td key={vi} style={{padding:"5px 7px",textAlign:"right",fontVariantNumeric:"tabular-nums",color:m.k==="cs"&&v>0?CC.grn:m.k==="cr"&&v>10?CC.grn:m.k==="cr"&&v>0?CC.org:CC.tx,fontWeight:vi===w?700:400,background:vi===w?"#EFF6FF":"transparent",fontSize:11.5}}>{v==null?"—":m.pct?v.toFixed(1)+"%":typeof v==="number"?v.toLocaleString(undefined,{maximumFractionDigits:1}):"—"}</td>);})}
+              {mi===0&&<td rowSpan={metrics.length} style={stickyState}>{st}</td>}
+              <td style={{...stickyMetric,background:mi%2===0?"#fff":"#FAFBFC"}}>{m.l}</td>
+              {filteredIndices.map(function(origIdx,ci){
+                var v = d[m.k] ? d[m.k][origIdx] : null;
+                var isSel = ci === filteredW;
+                return(<td key={ci} style={{
+                  padding:"5px 7px",textAlign:"right",fontVariantNumeric:"tabular-nums",
+                  color:m.k==="cs"&&v>0?CC.grn:m.k==="cr"&&v>10?CC.grn:m.k==="cr"&&v>0?CC.org:CC.tx,
+                  fontWeight:isSel?700:400,background:isSel?"#EFF6FF":"transparent",fontSize:11.5
+                }}>{v==null?"—":m.pct?v.toFixed(1)+"%":Math.round(v).toLocaleString()}</td>);
+              })}
             </tr>);});
         })}</tbody>
       </table>
@@ -103,7 +147,7 @@ function StateTable({states,w,wkLabels}){
   );
 }
 
-function BizPage({name,d,w,color,soldLabel,showPW,wkLabels,states}){
+function BizPage({name,d,w,color,soldLabel,showPW,wkLabels,states,allWeeks}){
   var sl=soldLabel||"Leads Sold";
   var cd=wkLabels.map(function(_,i){return{wk:wkLabels[i],gen:d.gen[i],sold:d.sold[i],sp:d.sp[i],tlS:d.tlS[i],tlC:d.tlC[i],tlR:d.tlR[i],pwS:d.pwS?d.pwS[i]:null,pwC:d.pwC?d.pwC[i]:null,pwR:d.pwR?d.pwR[i]:null};});
   return(
@@ -154,7 +198,7 @@ function BizPage({name,d,w,color,soldLabel,showPW,wkLabels,states}){
             </tr>);})}</tbody>
         </table>
       </div>
-      {states&&Object.keys(states).length>0&&(<><div style={{fontSize:11,fontWeight:700,color:CC.txL,letterSpacing:0.8,textTransform:"uppercase",marginBottom:8,fontFamily:FF}}>By State</div><StateTable states={states} w={w} wkLabels={wkLabels}/></>)}
+      {states&&Object.keys(states).length>0&&(<><div style={{fontSize:11,fontWeight:700,color:CC.txL,letterSpacing:0.8,textTransform:"uppercase",marginBottom:8,fontFamily:FF}}>By State</div><StateTable states={states} w={w} wkLabels={wkLabels} allWeeks={allWeeks}/></>)}
     </div>
   );
 }
@@ -177,7 +221,7 @@ function MADataTable({d,w,wkLabels,showTL}){
   );
 }
 
-function MACombined({w,t1,t23,wkLabels,states}){
+function MACombined({w,t1,t23,wkLabels,states,allWeeks}){
   var cd1=wkLabels.map(function(_,i){return{wk:wkLabels[i],gen:t1.gen[i],sold:t1.sold[i],sp:t1.sp[i],tlS:t1.tlS[i],tlC:t1.tlC[i],tlR:t1.tlR[i]};});
   var cd23=wkLabels.map(function(_,i){return{wk:wkLabels[i],gen:t23.gen[i],sold:t23.sold[i],sp:t23.sp[i]};});
   return(
@@ -196,7 +240,7 @@ function MACombined({w,t1,t23,wkLabels,states}){
         <div style={{background:CC.card,borderRadius:10,border:"1px solid "+CC.bdr,padding:"18px 18px 10px"}}><div style={{fontSize:11,fontWeight:700,color:CC.txL,letterSpacing:0.8,textTransform:"uppercase",marginBottom:10,fontFamily:FF}}>TL Pipeline & Conversion</div><TLChart data={cd1}/></div>
       </div>
       <MADataTable d={t1} w={w} wkLabels={wkLabels} showTL={true}/>
-      {states&&Object.keys(states).length>0&&(<><div style={{fontSize:11,fontWeight:700,color:CC.txL,letterSpacing:0.8,textTransform:"uppercase",marginBottom:8,fontFamily:FF}}>Tier 1 — By State</div><StateTable states={states} w={w} wkLabels={wkLabels}/></>)}
+      {states&&Object.keys(states).length>0&&(<><div style={{fontSize:11,fontWeight:700,color:CC.txL,letterSpacing:0.8,textTransform:"uppercase",marginBottom:8,fontFamily:FF}}>Tier 1 — By State</div><StateTable states={states} w={w} wkLabels={wkLabels} allWeeks={allWeeks}/></>)}
       <div style={{display:"flex",alignItems:"center",gap:10,marginTop:36,marginBottom:14}}><div style={{width:4,height:24,background:CC.pur,borderRadius:4}}/><h2 style={{fontSize:17,fontWeight:700,color:CC.tx,margin:0,fontFamily:FF}}>Tier 2/3</h2></div>
       <div style={{display:"flex",gap:12,marginBottom:20,flexWrap:"wrap"}}>
         <KPI label={"Leads Generated ("+wkLabels[w]+")"} val={t23.gen[w]} dv={vpct(t23.gen[w],a5(t23.gen,w))}/>
@@ -276,12 +320,12 @@ function AIPanel({w,data,wkLabels}){
       {aiResult&&(
         <div style={{display:"flex",flexDirection:"column",gap:16}}>
           <div style={{padding:"16px 18px",background:"#F8FAFC",borderRadius:10,border:"1px solid "+CC.bdrL}}>
-            <div style={{fontSize:12,fontWeight:700,color:CC.tx,marginBottom:10,fontFamily:FF}}>📊 Key Highlights</div>
+            <div style={{fontSize:12,fontWeight:700,color:CC.tx,marginBottom:10,fontFamily:FF}}>Key Highlights</div>
             <ul style={{margin:0,paddingLeft:18,listStyleType:"disc"}}>{(aiResult.highlights||[]).map(function(h,i){return(<li key={i} style={{fontSize:12.5,color:CC.tx2,lineHeight:1.7,marginBottom:4,fontFamily:FF}}>{h}</li>);})}</ul>
           </div>
           {aiResult.anomalies&&aiResult.anomalies.length>0&&(
             <div style={{padding:"16px 18px",background:"#F8FAFC",borderRadius:10,border:"1px solid "+CC.bdrL}}>
-              <div style={{fontSize:12,fontWeight:700,color:CC.tx,marginBottom:10,fontFamily:FF}}>🚨 Anomaly Alerts</div>
+              <div style={{fontSize:12,fontWeight:700,color:CC.tx,marginBottom:10,fontFamily:FF}}>Anomaly Alerts</div>
               {aiResult.anomalies.map(function(a,i){var sc=sevColors[a.severity]||sevColors.low;return(
                 <div key={i} style={{display:"flex",alignItems:"flex-start",gap:8,marginBottom:8,fontSize:12.5,lineHeight:1.6,fontFamily:FF}}>
                   <span style={{display:"inline-block",padding:"1px 8px",borderRadius:4,fontSize:10,fontWeight:700,textTransform:"uppercase",flexShrink:0,marginTop:2,background:sc.bg,color:sc.tx,border:"1px solid "+sc.bd}}>{a.severity}</span>
@@ -292,8 +336,8 @@ function AIPanel({w,data,wkLabels}){
           )}
           <div style={{padding:"16px 18px",background:"#F8FAFC",borderRadius:10,border:"1px solid "+CC.bdrL}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-              <div style={{fontSize:12,fontWeight:700,color:CC.tx,fontFamily:FF}}>✉️ Draft Email</div>
-              <button onClick={copyEmail} style={{padding:"5px 12px",background:copied?"#22C55E":"#fff",color:copied?"#fff":"#475569",border:"1px solid "+(copied?"#22C55E":CC.bdr),borderRadius:6,fontSize:11.5,fontWeight:600,cursor:"pointer",fontFamily:FF}}>{copied?"✓ Copied!":"📋 Copy Email"}</button>
+              <div style={{fontSize:12,fontWeight:700,color:CC.tx,fontFamily:FF}}>Draft Email</div>
+              <button onClick={copyEmail} style={{padding:"5px 12px",background:copied?"#22C55E":"#fff",color:copied?"#fff":"#475569",border:"1px solid "+(copied?"#22C55E":CC.bdr),borderRadius:6,fontSize:11.5,fontWeight:600,cursor:"pointer",fontFamily:FF}}>{copied?"Copied!":"Copy Email"}</button>
             </div>
             <pre style={{margin:0,padding:"14px 16px",background:"#fff",borderRadius:8,fontSize:12,lineHeight:1.75,color:CC.tx2,whiteSpace:"pre-wrap",wordBreak:"break-word",fontFamily:FF,border:"1px solid "+CC.bdrL,maxHeight:400,overflow:"auto"}}>{aiResult.emailDraft}</pre>
           </div>
@@ -386,6 +430,7 @@ export default function Home(){
   if(!data||w<0) return null;
 
   var wkLabels=data.weeks.map(shortWk);
+  var allWeeks=data.weeks;
 
   return(
     <><Head><title>Lead Gen BUs Performance Dashboard</title><link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet"/></Head>
@@ -415,9 +460,9 @@ export default function Home(){
         </div>
         <div style={{padding:"24px 28px 44px",maxWidth:1200}}>
           {pg==="overview"&&<Overview w={w} data={data} wkLabels={wkLabels}/>}
-          {pg==="lgm"&&<BizPage name="LGM — Legal Growth Marketing" d={data.lgm} w={w} color={CC.org} showPW={true} wkLabels={wkLabels} states={data.lgmStates}/>}
-          {pg==="spz"&&<BizPage name="SpringZip" d={data.spz} w={w} color={CC.org} soldLabel="Sold (excl. LGM)" showPW={true} wkLabels={wkLabels} states={data.spzStates}/>}
-          {pg==="ma"&&<MACombined w={w} t1={data.maTier1} t23={data.maTier23} wkLabels={wkLabels} states={data.maStates}/>}
+          {pg==="lgm"&&<BizPage name="LGM — Legal Growth Marketing" d={data.lgm} w={w} color={CC.org} showPW={true} wkLabels={wkLabels} states={data.lgmStates} allWeeks={allWeeks}/>}
+          {pg==="spz"&&<BizPage name="SpringZip" d={data.spz} w={w} color={CC.org} soldLabel="Sold (excl. LGM)" showPW={true} wkLabels={wkLabels} states={data.spzStates} allWeeks={allWeeks}/>}
+          {pg==="ma"&&<MACombined w={w} t1={data.maTier1} t23={data.maTier23} wkLabels={wkLabels} states={data.maStates} allWeeks={allWeeks}/>}
         </div>
       </div>
     </div></>
