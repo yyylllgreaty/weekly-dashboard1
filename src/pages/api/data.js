@@ -199,13 +199,33 @@ function parseStateData(rows, format, trendWeeks) {
     }
   } else {
     // LGM & MA: col0 = state abbreviation, col1 = metric name
+    // Find the "By State" section start, and stop at large blank gaps
+    var stateStart = -1;
     for (var r = 0; r < rows.length; r++) {
-      var st = ((rows[r]||[])[0]||'').trim().toUpperCase();
+      var c0 = ((rows[r]||[])[0]||'').trim().toLowerCase();
+      var c1 = ((rows[r]||[])[1]||'').trim().toLowerCase();
+      if (/by\s*state/i.test(c0) || /by\s*state/i.test(c1)) { stateStart = r + 1; break; }
+    }
+    if (stateStart < 0) stateStart = 0; // fallback: scan from beginning
+
+    var blankCount = 0;
+    for (var r = stateStart; r < rows.length; r++) {
+      var c0raw = ((rows[r]||[])[0]||'').trim();
+      var c1raw = ((rows[r]||[])[1]||'').trim();
+
+      // Count consecutive blank rows - stop after 3+ blanks (new section)
+      if (!c0raw && !c1raw) { blankCount++; if (blankCount >= 3) break; continue; }
+      blankCount = 0;
+
+      // Skip non-state rows (section headers like "CA Workers Comp")
+      var st = c0raw.toUpperCase();
       if (TRACKED.indexOf(st) === -1) continue;
+
+      // Make sure col1 is a metric name, not a section label like "Workers Comp"
+      if (/workers?\s*comp|pacific|pw\s|summary/i.test(c1raw)) continue;
+
       if (!states[st]) states[st] = emptyS();
-      var metric = ((rows[r]||[])[1]||'').trim();
-      if (!metric) continue;
-      assignMetric(st, metric, rows[r]);
+      assignMetric(st, c1raw, rows[r]);
     }
   }
   return states;
