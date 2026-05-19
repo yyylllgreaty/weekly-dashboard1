@@ -169,15 +169,25 @@ function parseStateData(rows, format, trendWeeks) {
 
   if (format === 'springzip') {
     var currentState = null;
+    var blankCount = 0;
     for (var r = 0; r < rows.length; r++) {
       var c0 = ((rows[r]||[])[0]||'').trim(), c1 = ((rows[r]||[])[1]||'').trim();
+
+      // Count consecutive blank rows - stop after 3+ blanks (different section like CA Workers Comp)
+      if (!c0 && !c1) { blankCount++; if (blankCount >= 3) break; continue; }
+      blankCount = 0;
+
       var c0u = c0.toUpperCase(), c1u = c1.toUpperCase();
+
+      // Skip CA Workers Comp and similar non-state sections
+      if (/workers?\s*comp|pacific\s*workers/i.test(c0) || /workers?\s*comp|pacific\s*workers/i.test(c1)) {
+        currentState = null; continue;
+      }
+
       // Detect state headers like "TX Vehicle", "AZ Vehicle"
       var foundState = null;
       for (var s = 0; s < TRACKED.length; s++) {
         if (c0u.indexOf(TRACKED[s]) === 0 || c1u.indexOf(TRACKED[s]) === 0) {
-          // Make sure it's a section header, not a metric row
-          // State headers typically have the state abbreviation + something like "Vehicle"
           var candidate = c0u.indexOf(TRACKED[s]) === 0 ? c0 : c1;
           if (/vehicle|state/i.test(candidate) || candidate.trim().length <= 3) {
             foundState = TRACKED[s]; break;
@@ -268,22 +278,31 @@ export default async function handler(req, res) {
     var spzRows = parseCSV(responses[2]);
     var spzStates = parseStateData(spzRows, 'springzip', weeks);
 
-    // If SpringZip states are mostly empty, add debug info
+    // Debug: capture SpringZip parsing info regardless
     var spzDebug = null;
     var txData = spzStates['TX'];
-    if (txData && !txData.gen.length) {
-      // Something went wrong - capture debug info
+    if (!txData || !txData.gen || !txData.gen.length || txData.gen.every(function(v){return v===null;})) {
       var tabI = getTabWeekInfo(spzRows);
       spzDebug = {
-        tabWeekLabels: tabI.weekLabels.slice(0,3),
-        weekCols: tabI.weekCols.slice(0,3),
-        sampleRows: []
+        tabWeekLabels: tabI.weekLabels.slice(0,5),
+        weekCols: tabI.weekCols.slice(0,5),
+        totalRows: spzRows.length,
+        statesFound: Object.keys(spzStates),
+        txHasGen: txData ? txData.gen.length : 'no TX',
+        // Show rows 15-35 (around By State section)
+        rows15to35: []
       };
-      for (var r = 0; r < Math.min(spzRows.length, 30); r++) {
-        var c0 = (spzRows[r]||[])[0]||'', c1 = (spzRows[r]||[])[1]||'';
-        if (c0 || c1) spzDebug.sampleRows.push({r:r, c0:c0.substring(0,30), c1:c1.substring(0,30)});
+      for (var r = 15; r < Math.min(spzRows.length, 40); r++) {
+        spzDebug.rows15to35.push({
+          r: r,
+          c0: ((spzRows[r]||[])[0]||'').substring(0,25),
+          c1: ((spzRows[r]||[])[1]||'').substring(0,25)
+        });
       }
     }
+
+    // Also add blank-gap stop for SpringZip (CA Workers Comp section)
+    // Already handled by the 'springzip' parser's section detection
 
     res.status(200).json({
       weeks:weeks, dateRanges:dateRanges,
