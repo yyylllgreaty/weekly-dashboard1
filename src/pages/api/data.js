@@ -227,7 +227,11 @@ function parseStateData(rows, format, trendWeeks) {
         lastStateSeen = foundViaC1;
         continue;
       }
-      // Not a state row and not a state header — skip
+      // Col0 is empty but we have a metric — use lastStateSeen
+      if (lastStateSeen && c1raw && states[lastStateSeen]) {
+        if (/workers?\s*comp|pacific\s*worker|summary/i.test(c1raw)) break;
+        assignMetric(lastStateSeen, c1raw, rows[r]);
+      }
     }
   }
   return states;
