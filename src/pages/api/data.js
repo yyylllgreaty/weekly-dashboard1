@@ -234,8 +234,8 @@ function parseStateData(rows, format, trendWeeks) {
     var vals = align(raw);
     if (/leads?\s*generated/i.test(metric)) states[st].gen = vals;
     else if (/leads?\s*routed/i.test(metric)) states[st].rt = vals;
-    else if (/sent\s*to\s*tl/i.test(metric)) states[st].ts = vals;
-    else if (/%\s*sent/i.test(metric) || /routing/i.test(metric)) states[st].tp = vals;
+    else if (/^%\s*sent/i.test(metric) || /routing\s*%/i.test(metric)) states[st].tp = vals;
+    else if (/leads?\s*sent\s*to\s*tl/i.test(metric)) states[st].ts = vals;
     else if (/contract\s*signed/i.test(metric)) states[st].cs = vals;
     else if (/conversion/i.test(metric)) states[st].cr = vals;
   }
