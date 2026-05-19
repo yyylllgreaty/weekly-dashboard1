@@ -1,192 +1,134 @@
 // src/pages/api/data.js
-// Fetches & parses Google Sheets CSV data for the Lead Gen BUs Dashboard
-
 const SHEET_ID = '1b62arI2j6Who4j4SlmxM2J5gXVF34w6N1tNdGKS-Xes';
 const csvUrl = (sheet) =>
   `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheet)}`;
 
-// ── CSV Parser ──
 function parseCSV(text) {
-  var rows = [];
-  var current = '';
-  var inQuotes = false;
-  var row = [];
+  var rows = [], current = '', inQuotes = false, row = [];
   for (var i = 0; i < text.length; i++) {
     var ch = text[i];
     if (inQuotes) {
-      if (ch === '"' && text[i + 1] === '"') { current += '"'; i++; }
+      if (ch === '"' && text[i+1] === '"') { current += '"'; i++; }
       else if (ch === '"') { inQuotes = false; }
       else { current += ch; }
     } else {
       if (ch === '"') { inQuotes = true; }
       else if (ch === ',') { row.push(current.trim()); current = ''; }
       else if (ch === '\n' || ch === '\r') {
-        if (ch === '\r' && text[i + 1] === '\n') i++;
+        if (ch === '\r' && text[i+1] === '\n') i++;
         row.push(current.trim());
-        if (row.some(function(c) { return c !== ''; })) rows.push(row);
+        if (row.some(function(c){return c!=='';})) rows.push(row);
         row = []; current = '';
       } else { current += ch; }
     }
   }
   row.push(current.trim());
-  if (row.some(function(c) { return c !== ''; })) rows.push(row);
+  if (row.some(function(c){return c!=='';})) rows.push(row);
   return rows;
 }
 
-// ── Number Parser ──
 function num(v) {
   if (v == null || v === '' || v === '-' || v === '\u2014' || v === 'n/a') return null;
-  var s = String(v).replace(/,/g, '').replace(/%/g, '').trim();
+  var s = String(v).replace(/,/g,'').replace(/%/g,'').trim();
   if (s === '' || s === '-' || s === '\u2014') return null;
-  var n = parseFloat(s);
-  return isNaN(n) ? null : n;
+  var n = parseFloat(s); return isNaN(n) ? null : n;
 }
 
-// ── Normalize week label for matching: "W44 2025" → "W44 2025", "W01 2026" → "W01 2026" ──
 function normalizeWeek(w) {
-  var m = (w || '').trim().match(/^(W)(\d+)\s+(\d{4})/i);
-  if (!m) return (w || '').trim();
-  // Pad week number to 2 digits for consistent matching
-  var wn = m[2].length === 1 ? '0' + m[2] : m[2];
-  return 'W' + wn + ' ' + m[3];
+  var m = (w||'').trim().match(/^W(\d+)\s+(\d{4})/i);
+  if (!m) return (w||'').trim();
+  var wn = m[1].length === 1 ? '0'+m[1] : m[1];
+  return 'W'+wn+' '+m[2];
 }
 
-// ── Parse week headers from a sheet ──
-// Supports two formats:
-//   Single-row: "W44 2025 Oct 27, 2025 - Nov 2, 2025" (trend tab)
-//   Two-row: Row1="W16 2026", Row2="Apr 13, 2026 - Apr 19, 2026" (individual tabs)
-// Returns { weeks: [...], dateRanges: [...] }
 function parseWeekHeaders(rows) {
-  var weeks = [];
-  var dateRanges = [];
-  if (!rows || rows.length === 0) return { weeks: weeks, dateRanges: dateRanges };
-
-  // Find first row with W## pattern
+  var weeks = [], dateRanges = [];
+  if (!rows || !rows.length) return {weeks:weeks, dateRanges:dateRanges};
   var headerRow = -1;
   for (var r = 0; r < Math.min(rows.length, 5); r++) {
-    for (var c = 1; c < (rows[r] || []).length; c++) {
-      if (/^W\d+/i.test(rows[r][c] || '')) { headerRow = r; break; }
+    for (var c = 1; c < (rows[r]||[]).length; c++) {
+      if (/^W\d+/i.test(rows[r][c]||'')) { headerRow = r; break; }
     }
     if (headerRow >= 0) break;
   }
-  if (headerRow < 0) return { weeks: weeks, dateRanges: dateRanges };
-
-  var hRow = rows[headerRow];
-  var nextRow = rows[headerRow + 1] || [];
-  var nextFirstData = (nextRow[1] || '').trim();
-  var nextRowIsDateRange =
-    nextFirstData.length > 0 &&
-    /[A-Z][a-z]{2}\s+\d/.test(nextFirstData) &&
-    !/(leads|sold|sent|contract|conversion|generated)/i.test(nextFirstData);
-
-  if (nextRowIsDateRange) {
+  if (headerRow < 0) return {weeks:weeks, dateRanges:dateRanges};
+  var hRow = rows[headerRow], nextRow = rows[headerRow+1]||[];
+  var nfd = (nextRow[1]||'').trim();
+  var twoRow = nfd.length > 0 && /[A-Z][a-z]{2}\s+\d/.test(nfd) &&
+    !/(leads|sold|sent|contract|conversion|generated)/i.test(nfd);
+  if (twoRow) {
     for (var c = 1; c < hRow.length; c++) {
-      var wk = (hRow[c] || '').trim();
-      if (/^W\d+/i.test(wk)) {
-        weeks.push(normalizeWeek(wk));
-        dateRanges.push((nextRow[c] || '').trim());
-      }
+      var wk = (hRow[c]||'').trim();
+      if (/^W\d+/i.test(wk)) { weeks.push(normalizeWeek(wk)); dateRanges.push((nextRow[c]||'').trim()); }
     }
   } else {
     for (var c = 1; c < hRow.length; c++) {
-      var cell = (hRow[c] || '').trim();
+      var cell = (hRow[c]||'').trim();
       if (!cell || !/^W\d+/i.test(cell)) continue;
       var m = cell.match(/^(W\d+\s+\d{4})\s+(.+)$/i);
-      if (m) {
-        weeks.push(normalizeWeek(m[1]));
-        dateRanges.push(m[2].trim());
-      } else {
-        weeks.push(normalizeWeek(cell));
-        dateRanges.push('');
-      }
+      if (m) { weeks.push(normalizeWeek(m[1])); dateRanges.push(m[2].trim()); }
+      else { weeks.push(normalizeWeek(cell)); dateRanges.push(''); }
     }
   }
-  return { weeks: weeks, dateRanges: dateRanges };
+  return {weeks:weeks, dateRanges:dateRanges};
 }
 
-// ── Extract week labels + column indices from individual business sheet tabs ──
-// Returns { weekLabels: ["W01 2026", "W02 2026", ...], weekCols: [colIndex, ...] }
 function getTabWeekInfo(rows) {
-  var weekLabels = [];
-  var weekCols = [];
+  var weekLabels = [], weekCols = [];
   for (var r = 0; r < Math.min(rows.length, 3); r++) {
-    for (var c = 0; c < (rows[r] || []).length; c++) {
-      var val = (rows[r][c] || '').trim();
-      if (/^W\d+/i.test(val)) {
-        weekLabels.push(normalizeWeek(val));
-        weekCols.push(c);
-      }
+    for (var c = 0; c < (rows[r]||[]).length; c++) {
+      var val = (rows[r][c]||'').trim();
+      if (/^W\d+/i.test(val)) { weekLabels.push(normalizeWeek(val)); weekCols.push(c); }
     }
     if (weekLabels.length > 0) break;
   }
-  return { weekLabels: weekLabels, weekCols: weekCols };
+  return {weekLabels:weekLabels, weekCols:weekCols};
 }
 
-// ── Find section row by label ──
 function findSection(rows, label, startFrom) {
-  var start = startFrom || 0;
-  var lbl = label.toLowerCase().trim();
+  var start = startFrom||0, lbl = label.toLowerCase().trim();
   for (var r = start; r < rows.length; r++) {
-    var cell = ((rows[r] || [])[0] || '').toLowerCase().trim();
+    var cell = ((rows[r]||[])[0]||'').toLowerCase().trim();
     if (cell === lbl || cell.startsWith(lbl)) return r;
   }
   return -1;
 }
 
-// ── Parse a business section from Weekly Performance Trend ──
 function parseBusinessSection(rows, sectionRow, weekCount) {
-  var result = { gen: [], sold: [], sp: [], tlS: [], tlC: [], tlR: [], pwS: [], pwC: [], pwR: [] };
+  var result = {gen:[],sold:[],sp:[],tlS:[],tlC:[],tlR:[],pwS:[],pwC:[],pwR:[]};
   var metricRows = [];
-  for (var r = sectionRow + 1; r < Math.min(sectionRow + 15, rows.length); r++) {
-    var label = ((rows[r] || [])[0] || '').trim().toLowerCase();
-    if (r > sectionRow + 1) {
-      if (label === 'springzip' || label === 'myaccident' || label === 'lgm' ||
-          label === 'tier 1' || label === 'tier 2/3') break;
-    }
-    metricRows.push({ label: label, row: rows[r] });
+  for (var r = sectionRow+1; r < Math.min(sectionRow+15, rows.length); r++) {
+    var label = ((rows[r]||[])[0]||'').trim().toLowerCase();
+    if (r > sectionRow+1 && /^(springzip|myaccident|lgm|tier\s*1|tier\s*2)/i.test(label)) break;
+    metricRows.push({label:label, row:rows[r]});
   }
-
-  var tlSentFound = false;
-  var pwSentFound = false;
-
+  var tlSentFound = false, pwSentFound = false;
   for (var i = 0; i < metricRows.length; i++) {
-    var label = metricRows[i].label;
-    var row = metricRows[i].row;
-    var vals = [];
-    for (var c = 1; c <= weekCount; c++) vals.push(num(row ? row[c] : ''));
-
+    var label = metricRows[i].label, row = metricRows[i].row, vals = [];
+    for (var c = 1; c <= weekCount; c++) vals.push(num(row?row[c]:''));
     if (/leads?\s*generated/i.test(label)) result.gen = vals;
-    else if (/leads?\s*sold/i.test(label) || /sold\s*\(excl/i.test(label)) result.sold = vals;
+    else if (/leads?\s*sold/i.test(label)||/sold\s*\(excl/i.test(label)) result.sold = vals;
     else if (/sold\s*%/i.test(label)) result.sp = vals;
     else if (/sent\s*to\s*(tl|thompson)/i.test(label)) { result.tlS = vals; tlSentFound = true; }
     else if (/sent\s*to\s*(pacific|pw)/i.test(label)) { result.pwS = vals; pwSentFound = true; }
     else if (/contract\s*signed/i.test(label)) {
-      if (pwSentFound && result.pwC.length === 0) result.pwC = vals;
-      else if (tlSentFound && result.tlC.length === 0) result.tlC = vals;
+      if (pwSentFound && !result.pwC.length) result.pwC = vals;
+      else if (tlSentFound && !result.tlC.length) result.tlC = vals;
     } else if (/conversion\s*rate/i.test(label)) {
-      if (pwSentFound && result.pwR.length === 0) result.pwR = vals;
-      else if (tlSentFound && result.tlR.length === 0) result.tlR = vals;
+      if (pwSentFound && !result.pwR.length) result.pwR = vals;
+      else if (tlSentFound && !result.tlR.length) result.tlR = vals;
     }
   }
   return result;
 }
 
-// ── Align state data arrays to the main trend weeks ──
-// tabWeekLabels = week labels from the individual tab (e.g. ["W01 2026", "W02 2026", ...])
-// trendWeeks = week labels from the trend tab (e.g. ["W44 2025", ..., "W20 2026"])
-// rawVals = the extracted values array (length = tabWeekLabels.length)
-// Returns: array of length trendWeeks.length, with nulls for weeks not in the tab
 function alignToTrend(rawVals, tabWeekLabels, trendWeeks) {
-  if (!rawVals || rawVals.length === 0) return [];
+  if (!rawVals || !rawVals.length) return [];
   var result = [];
   for (var i = 0; i < trendWeeks.length; i++) result.push(null);
-
-  // Build a map from tab week label to its index in rawVals
   for (var t = 0; t < tabWeekLabels.length; t++) {
-    var tabWeek = tabWeekLabels[t];
-    // Find matching trend week
     for (var tw = 0; tw < trendWeeks.length; tw++) {
-      if (trendWeeks[tw] === tabWeek) {
+      if (trendWeeks[tw] === tabWeekLabels[t]) {
         if (t < rawVals.length) result[tw] = rawVals[t];
         break;
       }
@@ -195,157 +137,144 @@ function alignToTrend(rawVals, tabWeekLabels, trendWeeks) {
   return result;
 }
 
-// ── Parse by-state data from individual business sheets, aligned to trend weeks ──
 function parseStateData(rows, format, trendWeeks) {
-  var states = {};
-  var TRACKED = ['TX', 'AZ', 'CA', 'GA', 'OH', 'IL'];
-
-  // Get week info from this tab
+  var states = {}, TRACKED = ['TX','AZ','CA','GA','OH','IL'];
   var tabInfo = getTabWeekInfo(rows);
-  var tabWeekLabels = tabInfo.weekLabels;
-  var weekCols = tabInfo.weekCols;
-
-  // Fallback: if no week columns found, use all columns after col 1
-  if (weekCols.length === 0) {
+  var tabWeekLabels = tabInfo.weekLabels, weekCols = tabInfo.weekCols;
+  if (!weekCols.length) {
     var maxCols = 0;
-    for (var r = 0; r < rows.length; r++) {
-      if ((rows[r] || []).length > maxCols) maxCols = rows[r].length;
-    }
+    for (var r = 0; r < rows.length; r++) if ((rows[r]||[]).length > maxCols) maxCols = rows[r].length;
     for (var c = 2; c < maxCols; c++) weekCols.push(c);
   }
 
-  function extractRawVals(row) {
+  function extractRaw(row) {
     var vals = [];
-    for (var i = 0; i < weekCols.length; i++) {
-      vals.push(num(row ? row[weekCols[i]] : ''));
-    }
+    for (var i = 0; i < weekCols.length; i++) vals.push(num(row?row[weekCols[i]]:''));
     return vals;
   }
-
-  function align(rawVals) {
-    if (tabWeekLabels.length > 0 && trendWeeks.length > 0) {
-      return alignToTrend(rawVals, tabWeekLabels, trendWeeks);
-    }
-    return rawVals; // No alignment possible, return as-is
+  function align(raw) {
+    return (tabWeekLabels.length && trendWeeks.length) ? alignToTrend(raw, tabWeekLabels, trendWeeks) : raw;
   }
-
-  function assignMetric(st, metric, row) {
-    var raw = extractRawVals(row);
-    var vals = align(raw);
-    if (/leads?\s*generated/i.test(metric)) states[st].gen = vals;
-    else if (/leads?\s*routed/i.test(metric)) states[st].rt = vals;
-    else if (/^%\s*sent/i.test(metric) || /routing\s*%/i.test(metric)) states[st].tp = vals;
-    else if (/leads?\s*sent\s*to\s*tl/i.test(metric)) states[st].ts = vals;
-    else if (/contract\s*signed/i.test(metric)) states[st].cs = vals;
-    else if (/conversion/i.test(metric)) states[st].cr = vals;
+  // IMPORTANT: check % Sent BEFORE Leads Sent, and use anchored patterns
+  function assignMetric(st, metricLabel, row) {
+    var raw = extractRaw(row), vals = align(raw), ml = metricLabel.toLowerCase();
+    if (/^%\s*sent/i.test(metricLabel) || /^routing/i.test(metricLabel)) states[st].tp = vals;
+    else if (/leads?\s*generated/i.test(ml)) states[st].gen = vals;
+    else if (/leads?\s*routed\s*\(/i.test(ml) || (/leads?\s*routed/i.test(ml) && !/routed\s*to\s*lgm/i.test(ml))) states[st].rt = vals;
+    else if (/leads?\s*sent\s*to\s*tl/i.test(ml) || /sent\s*to\s*tl/i.test(ml)) states[st].ts = vals;
+    else if (/contract\s*signed/i.test(ml)) states[st].cs = vals;
+    else if (/conversion/i.test(ml)) states[st].cr = vals;
   }
-
-  var emptyState = function() { return { gen: [], rt: [], ts: [], tp: [], cs: [], cr: [] }; };
+  var emptyS = function(){return{gen:[],rt:[],ts:[],tp:[],cs:[],cr:[]};};
 
   if (format === 'springzip') {
     var currentState = null;
     for (var r = 0; r < rows.length; r++) {
-      var c0 = ((rows[r] || [])[0] || '').trim().toUpperCase();
-      var c1 = ((rows[r] || [])[1] || '').trim().toUpperCase();
-
+      var c0 = ((rows[r]||[])[0]||'').trim(), c1 = ((rows[r]||[])[1]||'').trim();
+      var c0u = c0.toUpperCase(), c1u = c1.toUpperCase();
+      // Detect state headers like "TX Vehicle", "AZ Vehicle"
       var foundState = null;
       for (var s = 0; s < TRACKED.length; s++) {
-        if (c0.indexOf(TRACKED[s]) === 0 || c1.indexOf(TRACKED[s]) === 0) {
-          foundState = TRACKED[s]; break;
+        if (c0u.indexOf(TRACKED[s]) === 0 || c1u.indexOf(TRACKED[s]) === 0) {
+          // Make sure it's a section header, not a metric row
+          // State headers typically have the state abbreviation + something like "Vehicle"
+          var candidate = c0u.indexOf(TRACKED[s]) === 0 ? c0 : c1;
+          if (/vehicle|state/i.test(candidate) || candidate.trim().length <= 3) {
+            foundState = TRACKED[s]; break;
+          }
         }
       }
       if (foundState) {
         currentState = foundState;
-        if (!states[currentState]) states[currentState] = emptyState();
+        if (!states[currentState]) states[currentState] = emptyS();
         continue;
       }
       if (!currentState) continue;
-
-      var metric = ((rows[r] || [])[1] || (rows[r] || [])[0] || '').trim();
-      if (metric === '' || /^(by\s*state|total)/i.test(metric)) continue;
+      // Get metric label - try col1 first (where labels usually are), then col0
+      var metric = c1 || c0;
+      if (!metric || /^(by\s*state|total|$)/i.test(metric.trim())) continue;
+      // Stop if we hit a non-metric section header
+      if (/^(summary|input)/i.test(metric.trim())) { currentState = null; continue; }
       assignMetric(currentState, metric, rows[r]);
     }
   } else {
+    // LGM & MA: col0 = state abbreviation, col1 = metric name
     for (var r = 0; r < rows.length; r++) {
-      var st = ((rows[r] || [])[0] || '').trim().toUpperCase();
+      var st = ((rows[r]||[])[0]||'').trim().toUpperCase();
       if (TRACKED.indexOf(st) === -1) continue;
-      if (!states[st]) states[st] = emptyState();
-      var metric = ((rows[r] || [])[1] || '').trim();
+      if (!states[st]) states[st] = emptyS();
+      var metric = ((rows[r]||[])[1]||'').trim();
+      if (!metric) continue;
       assignMetric(st, metric, rows[r]);
     }
   }
-
   return states;
 }
 
-function emptyBiz() {
-  return { gen: [], sold: [], sp: [], tlS: [], tlC: [], tlR: [], pwS: [], pwC: [], pwR: [] };
-}
+function emptyBiz(){return{gen:[],sold:[],sp:[],tlS:[],tlC:[],tlR:[],pwS:[],pwC:[],pwR:[]};}
 
-// ── Main API Handler ──
 export default async function handler(req, res) {
   try {
     var responses = await Promise.all([
-      fetch(csvUrl('Weekly Performance Trend')).then(function(r) { return r.text(); }),
-      fetch(csvUrl('LGM')).then(function(r) { return r.text(); }),
-      fetch(csvUrl('SpringZip')).then(function(r) { return r.text(); }),
-      fetch(csvUrl('MyAccident')).then(function(r) { return r.text(); }),
+      fetch(csvUrl('Weekly Performance Trend')).then(function(r){return r.text();}),
+      fetch(csvUrl('LGM')).then(function(r){return r.text();}),
+      fetch(csvUrl('SpringZip')).then(function(r){return r.text();}),
+      fetch(csvUrl('MyAccident')).then(function(r){return r.text();}),
     ]);
-
     var trendRows = parseCSV(responses[0]);
-    var headerInfo = parseWeekHeaders(trendRows);
-    var weeks = headerInfo.weeks;
-    var dateRanges = headerInfo.dateRanges;
-    var weekCount = weeks.length;
-
-    if (weekCount === 0) {
+    var h = parseWeekHeaders(trendRows);
+    var weeks = h.weeks, dateRanges = h.dateRanges, weekCount = weeks.length;
+    if (!weekCount) {
       return res.status(200).json({
-        error: 'No weeks found in spreadsheet',
-        _debug: {
-          totalRows: trendRows.length,
-          firstRows: trendRows.slice(0, 10).map(function(r) { return r.slice(0, 5); }),
-        },
-        weeks: [], dateRanges: [],
-        lgm: emptyBiz(), spz: emptyBiz(), maTier1: emptyBiz(), maTier23: emptyBiz(),
-        lgmStates: {}, spzStates: {}, maStates: {},
-        lastUpdated: new Date().toISOString(),
+        error:'No weeks found in spreadsheet',
+        _debug:{totalRows:trendRows.length,firstRows:trendRows.slice(0,10).map(function(r){return r.slice(0,5);})},
+        weeks:[],dateRanges:[],lgm:emptyBiz(),spz:emptyBiz(),maTier1:emptyBiz(),maTier23:emptyBiz(),
+        lgmStates:{},spzStates:{},maStates:{},lastUpdated:new Date().toISOString(),
       });
     }
-
-    var lgmRow = findSection(trendRows, 'LGM');
-    var spzRow = findSection(trendRows, 'SpringZip', lgmRow > -1 ? lgmRow + 1 : 0);
-    var maRow = findSection(trendRows, 'MyAccident', spzRow > -1 ? spzRow + 1 : 0);
-
-    var lgm = lgmRow > -1 ? parseBusinessSection(trendRows, lgmRow, weekCount) : emptyBiz();
-    var spz = spzRow > -1 ? parseBusinessSection(trendRows, spzRow, weekCount) : emptyBiz();
-
-    var maTier1 = emptyBiz();
-    var maTier23 = emptyBiz();
+    var lgmRow = findSection(trendRows,'LGM');
+    var spzRow = findSection(trendRows,'SpringZip', lgmRow>-1?lgmRow+1:0);
+    var maRow = findSection(trendRows,'MyAccident', spzRow>-1?spzRow+1:0);
+    var lgm = lgmRow>-1 ? parseBusinessSection(trendRows,lgmRow,weekCount) : emptyBiz();
+    var spz = spzRow>-1 ? parseBusinessSection(trendRows,spzRow,weekCount) : emptyBiz();
+    var maTier1 = emptyBiz(), maTier23 = emptyBiz();
     if (maRow > -1) {
-      var t1Row = findSection(trendRows, 'Tier 1', maRow);
-      var t23Row = findSection(trendRows, 'Tier 2/3', maRow);
-      if (t1Row > -1) maTier1 = parseBusinessSection(trendRows, t1Row, weekCount);
-      if (t23Row > -1) maTier23 = parseBusinessSection(trendRows, t23Row, weekCount);
+      var t1 = findSection(trendRows,'Tier 1',maRow), t23 = findSection(trendRows,'Tier 2/3',maRow);
+      if (t1>-1) maTier1 = parseBusinessSection(trendRows,t1,weekCount);
+      if (t23>-1) maTier23 = parseBusinessSection(trendRows,t23,weekCount);
     }
 
-    // Parse state data, aligned to trend weeks
-    var lgmStates = parseStateData(parseCSV(responses[1]), 'standard', weeks);
-    var spzStates = parseStateData(parseCSV(responses[2]), 'springzip', weeks);
-    var maStates = parseStateData(parseCSV(responses[3]), 'standard', weeks);
+    // Parse state data with debug for SpringZip
+    var spzRows = parseCSV(responses[2]);
+    var spzStates = parseStateData(spzRows, 'springzip', weeks);
+
+    // If SpringZip states are mostly empty, add debug info
+    var spzDebug = null;
+    var txData = spzStates['TX'];
+    if (txData && !txData.gen.length) {
+      // Something went wrong - capture debug info
+      var tabI = getTabWeekInfo(spzRows);
+      spzDebug = {
+        tabWeekLabels: tabI.weekLabels.slice(0,3),
+        weekCols: tabI.weekCols.slice(0,3),
+        sampleRows: []
+      };
+      for (var r = 0; r < Math.min(spzRows.length, 30); r++) {
+        var c0 = (spzRows[r]||[])[0]||'', c1 = (spzRows[r]||[])[1]||'';
+        if (c0 || c1) spzDebug.sampleRows.push({r:r, c0:c0.substring(0,30), c1:c1.substring(0,30)});
+      }
+    }
 
     res.status(200).json({
-      weeks: weeks,
-      dateRanges: dateRanges,
-      lgm: lgm,
-      spz: spz,
-      maTier1: maTier1,
-      maTier23: maTier23,
-      lgmStates: lgmStates,
+      weeks:weeks, dateRanges:dateRanges,
+      lgm:lgm, spz:spz, maTier1:maTier1, maTier23:maTier23,
+      lgmStates: parseStateData(parseCSV(responses[1]), 'standard', weeks),
       spzStates: spzStates,
-      maStates: maStates,
+      maStates: parseStateData(parseCSV(responses[3]), 'standard', weeks),
+      _spzDebug: spzDebug,
       lastUpdated: new Date().toISOString(),
     });
-  } catch (err) {
-    res.status(500).json({ error: err.message, stack: err.stack });
+  } catch(err) {
+    res.status(500).json({error:err.message, stack:err.stack});
   }
 }
