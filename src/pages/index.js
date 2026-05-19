@@ -310,7 +310,7 @@ function AIPanel({w,data,wkLabels}){
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:aiResult?20:0}}>
         <div>
           <div style={{fontSize:14,fontWeight:700,color:CC.tx,fontFamily:FF}}>AI Analysis & Email Draft</div>
-          <div style={{fontSize:11.5,color:CC.txM,marginTop:3,fontFamily:FF}}>Compare actuals vs budget, flag anomalies, draft email for leadership</div>
+          <div style={{fontSize:11.5,color:CC.txM,marginTop:3,fontFamily:FF}}>Analyze trends, flag anomalies, draft email for leadership</div>
         </div>
         <button onClick={doAnalyze} disabled={aiLoading} style={{padding:"8px 18px",background:aiLoading?"#94A3B8":"linear-gradient(135deg,#2563EB,#7C3AED)",color:"#fff",border:"none",borderRadius:8,fontSize:13,fontWeight:600,cursor:aiLoading?"not-allowed":"pointer",fontFamily:FF,display:"flex",alignItems:"center",gap:8,boxShadow:aiLoading?"none":"0 2px 8px rgba(37,99,235,0.25)"}}>
           {aiLoading?("⏳ Analyzing..."):("✨ AI Analysis")}
