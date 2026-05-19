@@ -167,75 +167,67 @@ function parseStateData(rows, format, trendWeeks) {
   }
   var emptyS = function(){return{gen:[],rt:[],ts:[],tp:[],cs:[],cr:[]};};
 
-  if (format === 'springzip') {
-    var currentState = null;
-    var blankCount = 0;
-    for (var r = 0; r < rows.length; r++) {
-      var c0 = ((rows[r]||[])[0]||'').trim(), c1 = ((rows[r]||[])[1]||'').trim();
+  // Both LGM, SpringZip, and MA use same format: col0 = state abbreviation, col1 = metric name
+  // Find the "By State" section start
+  var stateStart = -1;
+  for (var r = 0; r < rows.length; r++) {
+    var c0 = ((rows[r]||[])[0]||'').trim().toLowerCase();
+    var c1 = ((rows[r]||[])[1]||'').trim().toLowerCase();
+    if (/by\s*state/i.test(c0) || /by\s*state/i.test(c1)) { stateStart = r + 1; break; }
+  }
+  if (stateStart < 0) stateStart = 0;
 
-      // Count consecutive blank rows - stop after 3+ blanks (different section like CA Workers Comp)
-      if (!c0 && !c1) { blankCount++; if (blankCount >= 3) break; continue; }
-      blankCount = 0;
+  var blankCount = 0;
+  var lastStateSeen = null;
+  var rowsSinceLastState = 0;
+  for (var r = stateStart; r < rows.length; r++) {
+    var c0raw = ((rows[r]||[])[0]||'').trim();
+    var c1raw = ((rows[r]||[])[1]||'').trim();
 
-      var c0u = c0.toUpperCase(), c1u = c1.toUpperCase();
+    // Count blank rows - stop after 3+ consecutive blanks
+    if (!c0raw && !c1raw) { blankCount++; if (blankCount >= 3 && lastStateSeen) break; continue; }
+    blankCount = 0;
 
-      // Skip CA Workers Comp and similar non-state sections
-      if (/workers?\s*comp|pacific\s*workers/i.test(c0) || /workers?\s*comp|pacific\s*workers/i.test(c1)) {
-        currentState = null; continue;
-      }
+    // Skip Workers Comp sections entirely
+    if (/workers?\s*comp/i.test(c0raw) || /workers?\s*comp/i.test(c1raw)) break;
 
-      // Detect state headers like "TX Vehicle", "AZ Vehicle"
-      var foundState = null;
-      for (var s = 0; s < TRACKED.length; s++) {
-        if (c0u.indexOf(TRACKED[s]) === 0 || c1u.indexOf(TRACKED[s]) === 0) {
-          var candidate = c0u.indexOf(TRACKED[s]) === 0 ? c0 : c1;
-          if (/vehicle|state/i.test(candidate) || candidate.trim().length <= 3) {
-            foundState = TRACKED[s]; break;
-          }
-        }
-      }
-      if (foundState) {
-        currentState = foundState;
-        if (!states[currentState]) states[currentState] = emptyS();
+    var st = c0raw.toUpperCase();
+    // Also check if col1 starts with a state (SpringZip "AZ Vehicle" style in col1)
+    var st1 = c1raw.toUpperCase();
+    var matchedState = null;
+    for (var s = 0; s < TRACKED.length; s++) {
+      if (st === TRACKED[s]) { matchedState = TRACKED[s]; break; }
+    }
+
+    if (matchedState) {
+      // This is a state row — check if col1 is a metric or a section header
+      var metric = c1raw;
+      if (!metric || /vehicle|^$/i.test(metric.trim())) {
+        // Section header like "TX" alone or "TX Vehicle" — just note the state
+        if (!states[matchedState]) states[matchedState] = emptyS();
+        lastStateSeen = matchedState;
         continue;
       }
-      if (!currentState) continue;
-      // Get metric label - try col1 first (where labels usually are), then col0
-      var metric = c1 || c0;
-      if (!metric || /^(by\s*state|total|$)/i.test(metric.trim())) continue;
-      // Stop if we hit a non-metric section header
-      if (/^(summary|input)/i.test(metric.trim())) { currentState = null; continue; }
-      assignMetric(currentState, metric, rows[r]);
-    }
-  } else {
-    // LGM & MA: col0 = state abbreviation, col1 = metric name
-    // Find the "By State" section start, and stop at large blank gaps
-    var stateStart = -1;
-    for (var r = 0; r < rows.length; r++) {
-      var c0 = ((rows[r]||[])[0]||'').trim().toLowerCase();
-      var c1 = ((rows[r]||[])[1]||'').trim().toLowerCase();
-      if (/by\s*state/i.test(c0) || /by\s*state/i.test(c1)) { stateStart = r + 1; break; }
-    }
-    if (stateStart < 0) stateStart = 0; // fallback: scan from beginning
+      // Skip non-metric labels
+      if (/workers?\s*comp|pacific\s*worker|summary/i.test(metric)) break;
 
-    var blankCount = 0;
-    for (var r = stateStart; r < rows.length; r++) {
-      var c0raw = ((rows[r]||[])[0]||'').trim();
-      var c1raw = ((rows[r]||[])[1]||'').trim();
-
-      // Count consecutive blank rows - stop after 3+ blanks (new section)
-      if (!c0raw && !c1raw) { blankCount++; if (blankCount >= 3) break; continue; }
-      blankCount = 0;
-
-      // Skip non-state rows (section headers like "CA Workers Comp")
-      var st = c0raw.toUpperCase();
-      if (TRACKED.indexOf(st) === -1) continue;
-
-      // Make sure col1 is a metric name, not a section label like "Workers Comp"
-      if (/workers?\s*comp|pacific|pw\s|summary/i.test(c1raw)) continue;
-
-      if (!states[st]) states[st] = emptyS();
-      assignMetric(st, c1raw, rows[r]);
+      if (!states[matchedState]) states[matchedState] = emptyS();
+      lastStateSeen = matchedState;
+      assignMetric(matchedState, metric, rows[r]);
+    } else {
+      // Col0 is not a tracked state — maybe it's a section header in col1 (SpringZip)
+      var foundViaC1 = null;
+      for (var s = 0; s < TRACKED.length; s++) {
+        if (st1.indexOf(TRACKED[s]) === 0 && /vehicle/i.test(c1raw)) {
+          foundViaC1 = TRACKED[s]; break;
+        }
+      }
+      if (foundViaC1) {
+        if (!states[foundViaC1]) states[foundViaC1] = emptyS();
+        lastStateSeen = foundViaC1;
+        continue;
+      }
+      // Not a state row and not a state header — skip
     }
   }
   return states;
